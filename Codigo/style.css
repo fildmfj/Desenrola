@@ -1,0 +1,59 @@
+body {
+    background-color: #ffffff;
+}
+.LogoSite{
+    display: grid;
+    justify-items: center;
+    align-items: start;
+}
+.tela-login {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f4f4f4;
+    font-family: Arial, sans-serif;
+}
+
+
+.card-login {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    width: 350px;
+}
+
+
+.campo-grupo {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+.campo-grupo label {
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.campo-grupo input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+ 
+
+.btn-entrar {
+    width: 100%;
+    padding: 12px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.btn-entrar:hover {
+    background-color: #0056b3;
+}
