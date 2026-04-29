@@ -1,0 +1,189 @@
+body {
+    background-color: #ffffff;
+}
+
+.LogoSite{
+    display: grid;
+    justify-items: center;
+    align-items: start;
+}
+
+
+.tela-login {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f4f4f4;
+    font-family: Arial, sans-serif;
+}
+
+.card-login h1{
+    text-align: center;
+    color: #ff9900
+}
+
+
+.card-login {
+    background: #1b4e58; 
+    padding: 30px;
+    border-radius: 30px; 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.915);
+    width: 450px;
+    height: auto;
+    text-align: left; 
+}
+
+
+.campo-grupo input{
+    padding: 12px;
+    border: auto;
+    border-radius: 20px; 
+    background-color: #f5f5dc;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 16px;
+    outline: auto;
+}
+
+.campo-grupo label{
+    color: white;
+}
+
+.campo-grupo a {
+    color: #ff9900;
+}
+
+.btn-entrar {
+    width: 80%;
+    padding: 12px;
+    background-color: #f5f5dc;
+    color: #1b4e58;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    display: block;      
+    margin: 0 auto;      
+    width: 50%;          
+    margin-bottom: 20px; 
+    text-align: center; 
+    text-align-last: center; 
+    
+}
+
+.campo-grupo {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px; 
+}
+
+.campo-grupo label {
+    margin-bottom: 10px;  
+    color: rgb(255, 255, 255);
+    font-weight: bold;
+    padding-left: 15px; 
+}
+
+.cabecalho{
+    background-color: #1b4e58;
+    display: flex; 
+    align-items: center; 
+    width: 100%;
+    height: 55px;
+}
+
+input[type="checkbox"]{
+    width: auto;
+    margin-right: 8px;
+    cursor: pointer;
+    
+}
+.cabecalho img{
+    width: 75px; ;
+}
+
+.container-flex {
+    background-color: #1b4e58;
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 0 40px; 
+    max-width: auto; 
+    margin: 0 auto; 
+}
+
+.container-flex p{
+    color: white;
+}
+
+.links {
+    display: flex; 
+    list-style: none;
+    gap: 20px; 
+    margin: 0;
+    padding: 0;
+}
+
+.links a{
+    color:#ff9900;
+}
+
+@media (max-width: 600px) {
+    .conteiner{
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+}
+
+.modal {
+    display: none; 
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.6); 
+}
+
+.modal-conteudo {
+    background-color: #f5f5dc; 
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 20px;
+    width: 300px; 
+    text-align: center;
+    position: relative;
+    color: #1b4e58;
+}
+
+.fechar {
+    position: absolute;
+    right: 15px;
+    top: 10px;
+    font-size: 24px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.cadastro,
+.entrar{
+    width: 80%;
+    padding: 12px;
+    background-color: #f5f5dc;
+    color: #1b4e58;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    display: block;      
+    margin: 0 auto;      
+    width: 20%;          
+    margin-bottom: 20px; 
+    text-align: center; 
+    text-align-last: center; 
+}
+
