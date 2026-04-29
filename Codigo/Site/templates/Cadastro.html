@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desenrola</title>
+</head>
+<body>
+    <div class="  LogoSite">  
+        <img src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo do site">
+    </div>
+    <div class="tela-login">
+        <div class="card-login">
+            <h1>Cadastro</h1> 
+            <form>
+                <div class="campo-grupo">
+                    <label for="digite-matricula">Digite sua Mátricula ou SIAPE:</label>
+                    <input type="text" id="campoID" placeholder="Digite sua Mátricula ou SIAPE">
+                </div>
+                <div class="campo-grupo">
+                    <label for="senha">Senha:</label>
+                    <input type="password" id="senha" placeholder="Crie uma senha">
+                </div>
+                <div class="campo-grupo">
+                    <label for="confirmar-senha">Confirmar Senha:</label>
+                    <input type="password" id="confirmar-senha" placeholder="Repita a senha">
+                </div>
+                <div class="campo-grupo" style="font-size: 12px;">
+                    <label> Já possui cadastro? <a href="Login.html">Faça Login</a></label> 
+                </div>
+                <div class="" style="font-size: 12px;">
+                    <input class="check" type="checkbox" value="" id="checkDefault">
+                    <label class="termo"  for="checkDefault">
+                        Eu li e aceito os <a href="Termos.html">termos de uso</a>
+                    </label>  
+                </div>
+                <button type="button" class="btn-entrar" onclick="verificar()" onclick="termos()">Entrar</button>
+            </form>
+        </div>
+    </div>
+    <footer class="meu-rodape">
+        <div class="container-flex">
+            <p>&copy; 2026 Desenrola. Todos os direitos reservados.</p>
+            <ul class="links">
+                <li><a href="">Sobre</a></li>
+                <li><a href="">Contato</a></li>
+                <li><a href="">Ajuda</a></li>
+            </ul>
+        </div>
+    </footer>
+    <script src="Js/script.js"></script> 
+</body>
+</html>

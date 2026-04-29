@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <link rel="stylesheet" href="../Css/style.css"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desenrola</title>
+</head>
+<body>
+    <div class="LogoSite">  
+        <img src="../Imagens/Logo-Desenrola.png" alt="Logo do site">
+    </div>
+    <div class="tela-login">
+        <div class="card-login">
+            <h1>Login</h1> 
+            <form>
+                <div class="campo-grupo">
+                    <label for="digite-matricula">Digite sua mátricula ou SIAPE:</label>
+                    <input type="text" id="campoID" placeholder="Digite sua mátricula ou SIAPE">
+                </div>
+                <div class="campo-grupo">
+                    <label for="senha">Senha:</label>
+                    <input type="password" id="senha" placeholder="Digite sua senha">
+                </div>
+                <div class="campo-grupo" style="font-size: 12px;">
+                    <label> Não possui cadastro? <a href="templates/Cadastro.html">Cadastre-se</a></label> 
+                </div>
+                <button type="button" class="btn-entrar" onclick="verificar()">Entrar</button>
+            </form>
+        </div>
+    </div>
+    <footer class="meu-rodape">
+        <div class="container-flex">
+            <p>&copy; 2026 Desenrola. Todos os direitos reservados.</p>
+            <ul class="links">
+                <li><a>Sobre</a></li>
+                <li><a>Contato</a></li>
+                <li><a>Ajuda</a></li>
+            </ul>
+        </div>
+    </footer>
+    <script src="../Js/script.js"></script> 
+</body>
+</html>
