@@ -62,7 +62,7 @@ body {
     border: none;
     border-radius: 50px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 25px;
     font-weight: bold;
     display: block;      
     margin: 0 auto;      
@@ -70,8 +70,8 @@ body {
     margin-bottom: 20px; 
     text-align: center; 
     text-align-last: center; 
-    
 }
+
 
 .campo-grupo {
     display: flex;
@@ -90,6 +90,7 @@ body {
     background-color: #1b4e58;
     display: flex; 
     align-items: center; 
+    justify-content: center;
     width: auto;
     height: 75px;
 }
@@ -125,9 +126,7 @@ body {
     min-height: 40vh;
     
 }
-.rodape-inicio{
-    
-}
+
 .container-flex {
     background-color: #1b4e58;
     display: flex; 
@@ -149,9 +148,6 @@ body {
     padding: 0;
 }
 
-.links a{
-    color:#ff9900;
-}
 
 @media (max-width: 600px) {
     .conteiner{
@@ -170,7 +166,6 @@ body {
 }
 .cadastro,
 .entrar{
-    
     padding: 10px;
     background-color: #f5f5dc;
     color: #1b4e58;
@@ -186,3 +181,22 @@ body {
     text-align-last: center; 
 }
 
+.MDisciplinas,
+.MProfessores,
+.MConversas{
+    width: 80%;
+    padding: 12px;
+    background-color: #f5f5dc;
+    color: #1b4e58;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 25px;
+    font-weight: bold;
+    display: block;      
+    margin: 0 auto;      
+    width: 50%;          
+    margin-bottom: 20px; 
+    text-align: center; 
+    text-align-last: center; 
+}

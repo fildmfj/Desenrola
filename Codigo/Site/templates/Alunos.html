@@ -12,25 +12,26 @@
 <body>
     <header class="cabecalho-aluno">
         <div class="icone-logo">
-            <img src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo do site">
+            <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo do site">
         </div>
-        
         <div class="container-flex">
-            
             <nav class="navbar">
                 <div class="container-fluid">
                     <ul class="links">
-                        <li><a href="Minhas Disciplinas">minhas disciplinas</a></li>
-                        <li><a href="Meus Professores">Meus professores</a></li>
-                        <li><a href="Minhas Conversas">Minhas Conversas</a></li>
+                        <div class="Alunos-disciplinas">
+                            <button class="MDisciplinas">Minhas disciplinas</button>
+                        </div>
+                        <div class="Alunos-professores">
+                            <button class="MProfessores">Meus professores</button>
+                        </div>
+                        <div class="Alunos-conversas">
+                            <button class="MConversas">Minhas Conversas</button>
+                        </div>
                     </ul>
-                    <form class="d-flex" role="search">
-                        <input class="form-control me-2" type="search" placeholder="Buscar" aria-label="Search">
-                        <button class="btn btn-outline-success" type="submit">Buscar</button>
-                    </form>
                 </div>
             </nav>
         </div>
     </header>
+    <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>
 </html>

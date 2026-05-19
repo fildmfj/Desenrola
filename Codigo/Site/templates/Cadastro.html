@@ -32,7 +32,7 @@
                 <div class="" style="font-size: 12px;">
                     <input class="check" type="checkbox" value="" id="checkDefault">
                     <label class="termo"  for="checkDefault">
-                        Eu li e aceito os <a href="Termos.html">termos de uso</a>
+                        Eu li e aceito os <a color: #ff9900 ; href="Termos.html">termos de uso</a>
                     </label>  
                 </div>
                 <button type="button" class="btn-entrar" onclick="verificar()" onclick="termos()">Entrar</button>
@@ -49,6 +49,6 @@
             </ul>
         </div>
     </footer>
-    <script src="Js/script.js"></script> 
+    <script src="{{ url_for('static', filename='Js/script.js') }}"></script> 
 </body>
 </html>
