@@ -1,37 +1,85 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://getbootstrap.com/docs/5.3/assets/css/docs.css" rel="stylesheet">
-    <title>Desenrola</title>
-    <script defer src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <title>Desenrola – Área do Aluno</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
 <body>
     <header class="cabecalho-aluno">
         <div class="icone-logo">
-            <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo do site">
+            <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo Desenrola">
         </div>
-        <div class="container-flex">
-            <nav class="navbar">
-                <div class="container-fluid">
-                    <ul class="links">
-                        <div class="Alunos-disciplinas">
-                            <button class="MDisciplinas">Minhas disciplinas</button>
-                        </div>
-                        <div class="Alunos-professores">
-                            <button class="MProfessores">Meus professores</button>
-                        </div>
-                        <div class="Alunos-conversas">
-                            <button class="MConversas">Minhas Conversas</button>
-                        </div>
-                    </ul>
-                </div>
-            </nav>
+        <nav class="nav-aluno">
+            <button class="btn-nav ativo" data-secao="disciplinas">Minhas Disciplinas</button>
+            <button class="btn-nav" data-secao="professores">Meus Professores</button>
+            <button class="btn-nav" data-secao="conversas">Minhas Conversas</button>
+        </nav>
+        <div class="usuario-info">
+            <span>Olá, {{ session.nome }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-sair">Sair</a>
         </div>
     </header>
+
+    <main class="conteudo-aluno">
+        <!-- Disciplinas -->
+        <section id="secao-disciplinas" class="secao ativo">
+            <h2>Minhas Disciplinas</h2>
+            {% if disciplinas %}
+                <div class="grade-cards">
+                    {% for d in disciplinas %}
+                    <div class="card-disciplina">
+                        <span class="codigo-disciplina">{{ d.codigo }}</span>
+                        <h3>{{ d.nome }}</h3>
+                        <p>Prof. {{ d.professor_nome or 'Não atribuído' }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="vazio">Nenhuma disciplina matriculada ainda.</p>
+            {% endif %}
+        </section>
+
+        <!-- Professores -->
+        <section id="secao-professores" class="secao">
+            <h2>Meus Professores</h2>
+            {% if professores %}
+                <div class="grade-cards">
+                    {% for p in professores %}
+                    <div class="card-professor">
+                        <div class="avatar">{{ p.nome[0] | upper }}</div>
+                        <h3>{{ p.nome }}</h3>  
+                        <p>SIAPE: {{ p.identificacao }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="vazio">Nenhum professor associado ainda.</p>
+            {% endif %}
+        </section>
+
+        <!-- Conversas -->
+        <section id="secao-conversas" class="secao">
+            <h2>Minhas Conversas</h2>
+            {% if conversas %}
+                <div class="lista-conversas">
+                    {% for c in conversas %}
+                    <div class="item-conversa">
+                        <div class="conversa-info">
+                            <strong>{{ c.assunto or 'Sem assunto' }}</strong>
+                            <span>Prof. {{ c.professor_nome }}</span>
+                        </div>
+                        <span class="data-conversa">{{ c.criado_em[:10] }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="vazio">Nenhuma conversa iniciada.</p>
+            {% endif %}
+        </section>
+    </main>
+
     <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>
 </html>

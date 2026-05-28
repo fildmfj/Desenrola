@@ -3,63 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Termo de uso</title>
+    <title>Desenrola – Termos de Uso</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
 <body>
-    <div style="display: grid;justify-items: center; align-items: start;">
-        <img style="align-items: center;" src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo do site">
+    <div class="LogoSite">
+        <a href="{{ url_for('inicio') }}">
+            <img src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo Desenrola">
+        </a>
     </div>
-    <div class="T-titulo" style="width: auto; border: 0px solid #ccc; padding: 100px;">
-        <h2>Termos e condições de uso</h2>
-        <h3>15/04/2026</h3>
-        <h4></h4>
-        <h3 style="text-align: justify; hyphens: auto; color: #ff9900">
+
+    <div class="termos-container">
+        <h2>Termos e Condições de Uso</h2>
+        <p class="data-termo">Última atualização: 20/05/2026</p>
+
+        <p class="aviso-termo">
             CASO VOCÊ NÃO CONCORDE COM QUAISQUER DAS DISPOSIÇÕES DESTES TERMOS,
             POR FAVOR NÃO ACESSE OU DE QUALQUER MODO UTILIZE O SITE.
-        </h3>
+        </p>
+
         <h3>1. Sobre o Site</h3>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            1.1. O Site, denominado Desenrola, visa abrir um canal de comunicação
-            para discentes e docentes, trazendo uma cultura de feedbacks contrutiveis. 
-            No site, você pode encontrar, por exemplo, fóruns, chats de conversas com seus professores,
-            bem como opções para o usuário sanar suas dúvidas por meio de envio de e-mail à  Estrutura Inicial. 
-        </h4>
-        <h3>2. Privacidade dos usuários</h3>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            2.1. Faz parte de nossa política respeitar a privacidade dos usuários. 
+        <p>
+            O Site, denominado <strong>Desenrola</strong>, visa abrir um canal de comunicação
+            para discentes e docentes, trazendo uma cultura de feedbacks construtivos.
+            No site, você pode encontrar fóruns, chats de conversas com seus professores,
+            bem como opções para sanar dúvidas por meio de envio de e-mail.
+        </p>
+
+        <h3>2. Privacidade dos Usuários</h3>
+        <p>
+            Faz parte de nossa política respeitar a privacidade dos usuários.
             Embora o ambiente do Site esteja sujeito a monitoramento por questões de segurança,
-            nós trataremos ou divulgaremos dados dos usuários do Site com uma base legal aplicável definida e para finalidades informadas,
-            ou a menos que sejamos obrigados a fazê-lo mediante ordem judicial ou por força de Legislação Aplicável.
-            Para mais informações, favor consultar a <a href="" style="color: #ff9900;">Política de Privacidade</a> disponível.
-            Tal política constitui parte integrante destes Termos e deverá ser lida integral e atentamente por todos os usuários.
-        </h4>
-        <h4 style="text-align: justify; hyphens: auto;"> 
-        </h4>
-        <h3>3. Aceite aos termos</h3>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            3.1. O acesso e/ou qualquer outra forma de utilização do Site por você equivalerá à  declaração expressa que você leu,
-            compreendeu e está integralmente de acordo com os presentes Termos, incluindo a <a href="" style="color: #ff9900;">Política de Privacidade</a>. 
-        </h4>
-        <h3>4. Alterações e atualizações aos termos</h3>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            4.1. Poderemos modificar estes Termos a qualquer momento, a nosso exclusivo critério, 
-            mediante a publicação no Site de termos de uso atualizados.
-        </h4>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            4.2. Para a sua comodidade, a data da última revisão destes Termos está disposta no topo desta página. 
-            Recomendamos que toda vez que você acessar o Site, fique atento à s novas atualizações destes Termos, 
-            pois o seu acesso e uso ao Site estarão vinculados à  última versão atualizada destes Termos.
-        </h4>
-        <h3>5. Responsabilidades do usuário</h3>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            6.1. O usuário deverá:
-                <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-                
-                </h4>
-        </h4>
-        <h4 style="text-align: justify; hyphens: auto; font-size: 12px;">
-            6.2. Proibições:
-        </h4>
+            trataremos ou divulgaremos dados dos usuários apenas com base legal aplicável,
+            ou mediante ordem judicial ou força de Legislação Aplicável.
+        </p>
+
+        <h3>3. Aceite aos Termos</h3>
+        <p>
+            O acesso e/ou qualquer outra forma de utilização do Site equivalerá à declaração expressa
+            de que você leu, compreendeu e está integralmente de acordo com os presentes Termos.
+        </p>
+
+        <h3>4. Alterações e Atualizações</h3>
+        <p>
+            Poderemos modificar estes Termos a qualquer momento, mediante publicação no Site de
+            termos atualizados. Recomendamos que você fique atento às novas versões a cada acesso.
+        </p>
+
+        <h3>5. Responsabilidades do Usuário</h3>
+        <p>O usuário deverá:</p>
+        <ul>
+            <li>Utilizar o Site de forma responsável e respeitosa;</li>
+            <li>Não compartilhar suas credenciais de acesso;</li>
+            <li>Não publicar conteúdo ofensivo, discriminatório ou ilegal;</li>
+            <li>Reportar problemas ou vulnerabilidades encontradas.</li>
+        </ul>
+        <p>É proibido:</p>
+        <ul>
+            <li>Tentar acessar contas de terceiros;</li>
+            <li>Utilizar o Site para fins comerciais não autorizados;</li>
+            <li>Reproduzir ou distribuir conteúdo sem autorização.</li>
+        </ul>
+
+        <a href="{{ url_for('cadastro') }}" class="btn-voltar">← Voltar ao Cadastro</a>
     </div>
+
+    <footer class="rodape">
+        <div class="container-flex">
+            <p>&copy; 2026 Desenrola. Todos os direitos reservados.</p>
+        </div>
+    </footer>
 </body>
 </html>

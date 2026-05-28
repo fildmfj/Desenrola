@@ -1,44 +1,61 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desenrola</title>
+    <title>Desenrola – Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
 <body>
-    <div class="LogoSite">  
-        <img src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo do site">
+    <div class="LogoSite">
+        <a href="{{ url_for('inicio') }}">
+            <img src="{{ url_for('static', filename='imagens/Logo-Desenrola.png') }}" alt="Logo Desenrola">
+        </a>
     </div>
+
     <div class="tela-login">
         <div class="card-login">
-            <h1>Login</h1> 
-            <form>
+            <h1>Login</h1>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                    <div class="alerta alerta-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endwith %}
+
+            <form method="POST" action="{{ url_for('login') }}" id="form-login">
                 <div class="campo-grupo">
-                    <label for="digite-matricula">Digite sua mátricula ou SIAPE:</label>
-                    <input type="text" id="campoID" placeholder="Digite sua mátricula ou SIAPE">
+                    <label for="identificacao">Matrícula ou SIAPE:</label>
+                    <input type="text" id="identificacao" name="identificacao"
+                           placeholder="Ex: 20221AB.CDE_I001 ou 1234567" required autocomplete="off">
+                    <span class="hint-tipo" id="hint-tipo"></span>
                 </div>
                 <div class="campo-grupo">
                     <label for="senha">Senha:</label>
-                    <input type="password" id="senha" placeholder="Digite sua senha">
+                    <input type="password" id="senha" name="senha"
+                           placeholder="Digite sua senha" required>
                 </div>
-                <div class="campo-grupo" style="font-size: 12px;">
-                    <label> Não possui cadastro? <a href="templates/Cadastro.html">Cadastre-se</a></label> 
+                <div class="campo-grupo" style="font-size:13px;">
+                    <label>Não possui cadastro?
+                        <a href="{{ url_for('cadastro') }}">Cadastre-se</a>
+                    </label>
                 </div>
-                <button type="button" class="btn-entrar" onclick="verificar()">Entrar</button>
+                <button type="submit" class="btn-entrar">Entrar</button>
             </form>
         </div>
     </div>
-    <footer class="meu-rodape">
+
+    <footer class="rodape">
         <div class="container-flex">
             <p>&copy; 2026 Desenrola. Todos os direitos reservados.</p>
             <ul class="links">
-                <li><a>Sobre</a></li>
-                <li><a>Contato</a></li>
-                <li><a>Ajuda</a></li>
+                <li><a href="#">Sobre</a></li>
+                <li><a href="#">Contato</a></li>
+                <li><a href="#">Ajuda</a></li>
             </ul>
         </div>
     </footer>
-    <script src="{{ url_for('static', filename='js/script.j') }}"></script> 
+
+    <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>
 </html>

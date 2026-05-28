@@ -1,12 +1,65 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Desenrola – Área do Professor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
 <body>
-    
+    <header class="cabecalho-aluno">
+        <div class="icone-logo">
+            <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo Desenrola">
+        </div>
+        <nav class="nav-aluno">
+            <button class="btn-nav ativo" data-secao="disciplinas">Minhas Disciplinas</button>
+            <button class="btn-nav" data-secao="conversas">Conversas com Alunos</button>
+        </nav>
+        <div class="usuario-info">
+            <span>Olá, Prof. {{ session.nome }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-sair">Sair</a>
+        </div>
+    </header>
+
+    <main class="conteudo-aluno">
+        <!-- Disciplinas -->
+        <section id="secao-disciplinas" class="secao ativo">
+            <h2>Minhas Disciplinas</h2>
+            {% if disciplinas %}
+                <div class="grade-cards">
+                    {% for d in disciplinas %}
+                    <div class="card-disciplina">
+                        <span class="codigo-disciplina">{{ d.codigo }}</span>
+                        <h3>{{ d.nome }}</h3>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="vazio">Nenhuma disciplina atribuída ainda.</p>
+            {% endif %}
+        </section>
+
+        <!-- Conversas -->
+        <section id="secao-conversas" class="secao">
+            <h2>Conversas com Alunos</h2>
+            {% if conversas %}
+                <div class="lista-conversas">
+                    {% for c in conversas %}
+                    <div class="item-conversa">
+                        <div class="conversa-info">
+                            <strong>{{ c.assunto or 'Sem assunto' }}</strong>
+                            <span>Aluno: {{ c.aluno_nome }}</span>
+                        </div>
+                        <span class="data-conversa">{{ c.criado_em[:10] }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="vazio">Nenhuma conversa recebida.</p>
+            {% endif %}
+        </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>
 </html>
