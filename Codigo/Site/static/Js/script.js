@@ -99,7 +99,135 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => alerta.remove(), 500);
         }, 4000);
     });
+    const chatPanel = document.getElementById('chat-panel');
+    if (chatPanel && typeof io !== 'undefined') {
+        const socket = io();
+        const meuId  = parseInt(document.body.dataset.usuarioId);
+        let idDestinatario = null;
 
+        document.querySelectorAll('.item-conversa[data-usuario-id]').forEach(item => {
+            const idOutro = parseInt(item.dataset.usuarioId);
+            socket.emit('entrar_sala', { id_destinatario: idOutro });
+        });
+
+        document.querySelectorAll('.card-professor[data-usuario-id]').forEach(card => {
+            const idOutro = parseInt(card.dataset.usuarioId);
+            socket.emit('entrar_sala', { id_destinatario: idOutro });
+        });
+
+        window.abrirChat = function(idProf, nomeProf) {
+            idDestinatario = idProf;
+            document.getElementById('chat-nome').textContent   = nomeProf;
+            document.getElementById('chat-panel').classList.add('aberto');
+            document.getElementById('chat-overlay').style.display = 'block';
+            socket.emit('entrar_sala', { id_destinatario: idProf });
+            carregarHistorico(idProf);
+            document.getElementById('chat-input-texto').focus();
+        };
+
+        window.fecharChat = function() {
+            document.getElementById('chat-panel').classList.remove('aberto');
+            document.getElementById('chat-overlay').style.display = 'none';
+            idDestinatario = null;
+        };
+        
+
+        function carregarHistorico(idProf) {
+            const container = document.getElementById('chat-mensagens');
+            container.innerHTML = '<p class="chat-vazio">Carregando…</p>';
+            fetch(`/mensagens/${idProf}`)
+                .then(r => r.json())
+                .then(data => {
+                    container.innerHTML = '';
+                    if (data.mensagens.length === 0) {
+                        container.innerHTML = '<p class="chat-vazio">Nenhuma mensagem ainda. Diga olá!</p>';
+                        return;
+                    }
+                    data.mensagens.forEach(m => adicionarMensagem(m, false));
+                    container.scrollTop = container.scrollHeight;
+                });
+        }
+
+        window.enviarMensagem = function() {
+            const input = document.getElementById('chat-input-texto');
+            const texto = input.value.trim();
+            if (!texto || !idDestinatario) return;
+            socket.emit('enviar_mensagem', { id_destinatario: idDestinatario, conteudo: texto });
+            input.value = '';
+            input.focus();
+        };
+
+        socket.on('nova_mensagem', msg => {adicionarMensagem(msg, true); atualizarListaConversas(msg);});
+
+        function atualizarListaConversas(msg) {
+            const lista = document.querySelector('.lista-conversas');
+            if (!lista) return;
+
+            const idOutro = msg.id_remetente === meuId ? idDestinatario : msg.id_remetente;
+            const nomeOutro = document.getElementById('chat-nome').textContent;
+            const prefixo = msg.id_remetente === meuId ? 'Você: ' : msg.nome_remetente + ': ';
+
+            let item = lista.querySelector(`[data-usuario-id="${idOutro}"]`);
+
+            if (item) {
+                item.querySelector('.conversa-info span').textContent = prefixo + msg.conteudo;
+                item.querySelector('.data-conversa').textContent = new Date().toLocaleString('pt-BR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                lista.prepend(item);
+            } else {
+                const div = document.createElement('div');
+                div.className = 'item-conversa';
+                div.dataset.usuarioId = idOutro;
+                div.onclick = () => abrirChat(idOutro, nomeOutro);
+                div.innerHTML = `
+                    <div class="conversa-info">
+                        <strong>${nomeOutro}</strong>
+                        <span>${prefixo}${msg.conteudo}</span>
+                    </div>
+                    <span class="data-conversa">${new Date().toLocaleString('pt-BR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    })}</span>
+                `;
+                lista.prepend(div);
+
+                const vazio = document.querySelector('#secao-conversas .vazio');
+                if (vazio) vazio.remove();
+            }
+        }
+
+        function adicionarMensagem(msg, rolar) {
+            const container = document.getElementById('chat-mensagens');
+
+            const vazio = container.querySelector('.chat-vazio');
+            if (vazio) vazio.remove();
+
+            const souEu = msg.id_remetente === meuId;
+            const hora  = msg.criado_em === '__agora__'
+                ? new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                : msg.criado_em;
+
+            const div = document.createElement('div');
+            div.className = 'msg ' + (souEu ? 'msg-eu' : 'msg-outro');
+            div.innerHTML = `
+                ${!souEu ? `<span class="msg-remetente">${msg.nome_remetente}</span>` : ''}
+                <span class="msg-texto">${msg.conteudo}</span>
+                <span class="msg-hora">${hora}</span>
+            `;
+            container.appendChild(div);
+            if (rolar) container.scrollTop = container.scrollHeight;
+        }
+
+        const chatInput = document.getElementById('chat-input-texto');
+        if (chatInput) {
+            chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') enviarMensagem(); });
+        }
+
+        const overlay = document.getElementById('chat-overlay');
+        if (overlay) overlay.addEventListener('click', fecharChat);
+    }
     
 });
 

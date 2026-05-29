@@ -2,15 +2,17 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 import mysql.connector
 import hashlib
 import re
+from flask_socketio import SocketIO, emit, join_room
 
 app = Flask(__name__)
 app.secret_key = 'f01e5011b1c1ff3e0a556e0d607eca775021a2e1d0ec19626e225a00b4b85dc9'
+socketio = SocketIO(app)
 
 # Configuração MySQL 
 DB_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'root',
+    'password': '',
     'database': 'desenrola',
     'charset': 'utf8mb4'
 }
@@ -25,7 +27,7 @@ def hash_senha(senha):
 
 # Validação de usuário e identificação do tipo
 MATRICULA = re.compile(r'^20\d{2}1[A-Z]{2}\.[A-Z]{3}_I0\d{3}$')
-SIAPE = re.compile(r'^20\d{2}1[A-Z]{2}\.[A-Z]{3}_I0\d{3}$')
+SIAPE = re.compile(r'^\d{7,8}$')
 
 def detectar_tipo(identi):
     if MATRICULA.match(identi):
@@ -38,7 +40,13 @@ def detectar_tipo(identi):
 
 @app.route('/')
 def inicio():
-    return render_template('alunos.html')
+    return render_template('InicioSite.html')
+    # if 'usuario_id' not in session:
+    #     return redirect(url_for('login'))
+    # if session.get('tipo') == 'aluno':
+    #     return redirect(url_for('alunos'))
+    # else:
+    #     return render_template('professores.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -62,7 +70,7 @@ def login():
         conn.close()
 
         if usuario:
-            session['usuario_id'] = usuario['id']
+            session['usuario_id'] = usuario['id_usuario']
             session['identificacao'] = usuario['identificacao']
             session['tipo'] = usuario['tipo']
             session['nome'] = usuario['nome'] or usuario['identificacao']
@@ -86,14 +94,14 @@ def cadastro():
         tipo = detectar_tipo(identificacao)
         if not tipo:
             flash('Matrícula ou SIAPE com formato inválido.', 'erro')
-            return render_template('Cadastro.html')  # ← faltava o return
+            return render_template('Cadastro.html')
 
         if senha != confirmar_senha:
             flash('As senhas não coincidem.', 'erro')
             return render_template('Cadastro.html')
 
         if len(senha) < 6:
-            flash('A senha deve ter pelo menos 6 caracteres.', 'erro')  # ← mensagem errada no original
+            flash('A senha deve ter pelo menos 6 caracteres.', 'erro')
             return render_template('Cadastro.html')
 
         if not aceite_termos:
@@ -104,7 +112,7 @@ def cadastro():
         cursor = conn.cursor(dictionary=True)
         try:
             cursor.execute(
-                'SELECT id FROM usuario WHERE identificacao = %s',
+                'SELECT id_usuario FROM usuario WHERE identificacao = %s',
                 (identificacao,)
             )
             existente = cursor.fetchone()
@@ -121,10 +129,18 @@ def cadastro():
                     'INSERT INTO usuario (identificacao, tipo, senha_hash, nome) VALUES (%s, %s, %s, %s)',
                     (identificacao, tipo, hash_senha(senha), nome or identificacao)
                 )
+                id = cursor.lastrowid
 
             conn.commit()
-            flash('Cadastro realizado com sucesso! Faça o login.', 'sucesso')
-            return redirect(url_for('login'))
+            flash('Cadastro realizado com sucesso!', 'sucesso')
+            session['usuario_id'] = id if not existente else existente['id_usuario']
+            session['identificacao'] = identificacao
+            session['tipo'] = tipo
+            session['nome'] = nome or identificacao
+            if session['tipo'] == 'aluno':
+                return redirect(url_for('alunos'))
+            else:
+                return redirect(url_for('professores'))
 
         except Exception as e:
             conn.rollback()
@@ -146,20 +162,20 @@ def alunos():
     # Disciplinas matriculadas pelo aluno (com curso e professor)
     cursor.execute('''
         SELECT d.nome,
-               d.codigo,
-               c.nome  AS curso_nome,
-               c.sigla AS curso_sigla,
-               u.nome  AS professor_nome,
-               p.descricao AS periodo_descricao,
-               m.situacao
+            d.codigo,
+            c.nome  AS curso_nome,
+            c.sigla AS curso_sigla,
+            u.nome  AS professor_nome,
+            p.descricao AS periodo_descricao,
+            m.situacao
         FROM matricula_disciplina m
         JOIN disciplina d  ON d.id_disciplina = m.id_disciplina
         JOIN curso      c  ON c.id_curso      = d.id_curso
-        JOIN usuario    u  ON u.id_aluno   = d.id_professor
+        JOIN usuario    u  ON u.id_usuario    = d.id_professor
         JOIN periodo    p  ON p.id_periodo    = m.id_periodo
         WHERE m.id_aluno = %s
         ORDER BY p.data_inicio DESC, d.nome
-    ''', (session['id_aluno'],))
+    ''', (session['usuario_id'],))
     disciplinas = cursor.fetchall()
  
     # Professores das disciplinas do aluno (sem repetição)
@@ -191,14 +207,48 @@ def alunos():
         ORDER BY f.criado_em DESC
     ''', (session['usuario_id'],))
     feedbacks = cursor.fetchall()
+
+    cursor.execute('''
+        SELECT 
+            u.id_usuario, u.nome, u.identificacao,
+            MAX(m.criado_em) AS ultima_mensagem,
+            (SELECT CONCAT(
+                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+                m2.conteudo
+            ) FROM mensagem m2
+            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+        FROM mensagem m
+        JOIN usuario u ON u.id_usuario = CASE
+            WHEN m.id_remetente = %s THEN m.id_destinatario
+            ELSE m.id_remetente
+        END
+        WHERE m.id_remetente = %s OR m.id_destinatario = %s
+        GROUP BY u.id_usuario, u.nome, u.identificacao
+        ORDER BY ultima_mensagem DESC
+    ''', (
+        session['usuario_id'],  # CASE do CONCAT
+        session['usuario_id'],  # id_remetente do WHERE interno
+        session['usuario_id'],  # id_destinatario do WHERE interno
+        session['usuario_id'],  # CASE do JOIN externo
+        session['usuario_id'],  # WHERE externo remetente
+        session['usuario_id'],  # WHERE externo destinatario
+    ))
+    conversas = cursor.fetchall()
+
+    for c in conversas:
+        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
     cursor.close()
     conn.close()
  
     return render_template('Alunos.html',
-                           disciplinas=disciplinas,
-                           professores=professores,
-                           feedbacks=feedbacks)
+                        disciplinas=disciplinas,
+                        professores=professores,
+                        feedbacks=feedbacks,
+                        conversas=conversas)
  
  
 @app.route('/professores')
@@ -241,13 +291,58 @@ def professores():
         ORDER BY f.criado_em DESC
     ''', (session['usuario_id'],))
     feedbacks = cursor.fetchall()
+
+    cursor.execute('''
+        SELECT DISTINCT u.id_usuario, u.nome, u.identificacao
+        FROM usuario u
+        JOIN matricula_disciplina m ON m.id_aluno = u.id_usuario
+        JOIN disciplina d ON d.id_disciplina = m.id_disciplina
+        WHERE d.id_professor = %s
+        ORDER BY u.nome
+    ''', (session['usuario_id'],))
+    alunos = cursor.fetchall()
+
+    # Conversas — últimas mensagens por aluno
+    cursor.execute('''
+        SELECT 
+            u.id_usuario, u.nome, u.identificacao,
+            MAX(m.criado_em) AS ultima_mensagem,
+            (SELECT CONCAT(
+                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+                m2.conteudo
+            ) FROM mensagem m2
+            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+        FROM mensagem m
+        JOIN usuario u ON u.id_usuario = CASE
+            WHEN m.id_remetente = %s THEN m.id_destinatario
+            ELSE m.id_remetente
+        END
+        WHERE m.id_remetente = %s OR m.id_destinatario = %s
+        GROUP BY u.id_usuario, u.nome, u.identificacao
+        ORDER BY ultima_mensagem DESC
+    ''', (
+        session['usuario_id'],  # CASE do CONCAT
+        session['usuario_id'],  # id_remetente do WHERE interno
+        session['usuario_id'],  # id_destinatario do WHERE interno
+        session['usuario_id'],  # CASE do JOIN externo
+        session['usuario_id'],  # WHERE externo remetente
+        session['usuario_id'],  # WHERE externo destinatario
+    ))
+    conversas = cursor.fetchall()
+    for c in conversas:
+        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
     cursor.close()
     conn.close()
  
     return render_template('Professores.html',
                            disciplinas=disciplinas,
-                           feedbacks=feedbacks)
+                           feedbacks=feedbacks,
+                           alunos=alunos,
+                           conversas=conversas)
 
 @app.route('/termos')
 def termos():
@@ -256,13 +351,79 @@ def termos():
 @app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('InicioSite.html'))
+    return redirect(url_for('inicio'))
 # API auxiliar
 @app.route('/api/validar-id', methods=['POST'])
 def validar_id():
     identificacao = request.json.get('identificacao', '')
     tipo = detectar_tipo(identificacao)
     return jsonify({'validar': tipo is not None, 'tipo': tipo})
+
+@app.route('/mensagens/<int:id_destinatario>')
+def get_mensagens(id_destinatario):
+    if 'usuario_id' not in session:
+        return {'erro': 'não autenticado'}, 401
+
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute('''
+        SELECT m.conteudo, m.criado_em,
+               m.id_remetente,
+               u.nome AS nome_remetente
+        FROM mensagem m
+        JOIN usuario u ON u.id_usuario = m.id_remetente
+        WHERE (m.id_remetente = %s AND m.id_destinatario = %s)
+           OR (m.id_remetente = %s AND m.id_destinatario = %s)
+        ORDER BY m.criado_em ASC
+    ''', (session['usuario_id'], id_destinatario,
+          id_destinatario, session['usuario_id']))
+    msgs = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    # converte datetime para string
+    for m in msgs:
+        m['criado_em'] = m['criado_em'].strftime('%H:%M')
+    return {'mensagens': msgs}
+
+# Evento SocketIO — entrar na sala do chat
+@socketio.on('entrar_sala')
+def entrar_sala(data):
+    # sala única entre dois usuários, independente de quem iniciou
+    sala = '_'.join(sorted([
+        str(session['usuario_id']),
+        str(data['id_destinatario'])
+    ]))
+    join_room(sala)
+
+# Evento SocketIO — enviar mensagem
+@socketio.on('enviar_mensagem')
+def handle_mensagem(data):
+    id_dest = data['id_destinatario']
+    conteudo = data['conteudo'].strip()
+    if not conteudo:
+        return
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        'INSERT INTO mensagem (id_remetente, id_destinatario, conteudo) VALUES (%s, %s, %s)',
+        (session['usuario_id'], id_dest, conteudo)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    sala = '_'.join(sorted([str(session['usuario_id']), str(id_dest)]))
+
+    emit('nova_mensagem', {
+        'conteudo': conteudo,
+        'id_remetente': session['usuario_id'],
+        'nome_remetente': session['nome'],
+        'criado_em': '__agora__'
+    }, to=sala)
+
+
 # Inicialização
 if __name__ == '__main__':
-    app.run(debug=True) 
+    socketio.run(app, debug=True)

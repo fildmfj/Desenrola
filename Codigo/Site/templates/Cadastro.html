@@ -16,7 +16,7 @@
 
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% for category, message in messages%}
-                    <div class="alerta alerta -{{ category }}"> {{get_flashed_message}} </div>
+                    <div class="alerta alerta-{{ category }}"> {{ message }} </div>
                 {% endfor %}
             {% endwith %}
 

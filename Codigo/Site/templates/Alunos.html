@@ -6,7 +6,7 @@
     <title>Desenrola – Área do Aluno</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='Css/style.css') }}">
 </head>
-<body>
+<body data-usuario-id="{{ session['usuario_id'] }}">
     <header class="cabecalho-aluno">
         <div class="icone-logo">
             <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo Desenrola">
@@ -47,11 +47,11 @@
             {% if professores %}
                 <div class="grade-cards">
                     {% for p in professores %}
-                    <div class="card-professor">
-                        <div class="avatar">{{ p.nome[0] | upper }}</div>
-                        <h3>{{ p.nome }}</h3>  
-                        <p>SIAPE: {{ p.identificacao }}</p>
-                    </div>
+                        <div class="card-professor" onclick="abrirChat('{{ p.id_usuario }}', '{{ p.nome }}')">
+                            <div class="avatar">{{ p.nome[0] | upper }}</div>
+                            <h3>{{ p.nome }}</h3>
+                            <p>SIAPE: {{ p.identificacao }}</p>
+                        </div>
                     {% endfor %}
                 </div>
             {% else %}
@@ -65,21 +65,34 @@
             {% if conversas %}
                 <div class="lista-conversas">
                     {% for c in conversas %}
-                    <div class="item-conversa">
+                    <div class="item-conversa" data-usuario-id="{{ c.id_usuario }}" onclick="abrirChat('{{ c.id_usuario }}', '{{ c.nome }}')">
                         <div class="conversa-info">
-                            <strong>{{ c.assunto or 'Sem assunto' }}</strong>
-                            <span>Prof. {{ c.professor_nome }}</span>
+                            <strong>{{ c.nome }}</strong>
+                            <span>{{ c.ultimo_texto }}</span>
                         </div>
-                        <span class="data-conversa">{{ c.criado_em[:10] }}</span>
+                        <span class="data-conversa">{{ c.ultima_mensagem }}</span>
                     </div>
                     {% endfor %}
                 </div>
             {% else %}
-                <p class="vazio">Nenhuma conversa iniciada.</p>
+                <p class="vazio">Nenhuma conversa iniciada ainda.</p>
             {% endif %}
         </section>
     </main>
 
+    <div class="chat-overlay" id="chat-overlay" style="display:none"></div>
+    <div class="chat-panel" id="chat-panel">
+        <div class="chat-header">
+            <span id="chat-nome"></span>
+            <button onclick="fecharChat()">✕</button>
+        </div>
+        <div class="chat-mensagens" id="chat-mensagens"></div>
+        <div class="chat-input">
+            <input type="text" id="chat-input-texto" placeholder="Digite sua mensagem...">
+            <button onclick="enviarMensagem()">Enviar</button>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>
 </html>
