@@ -191,22 +191,6 @@ def alunos():
         ORDER BY u.nome
     ''', (session['usuario_id'],))
     professores = cursor.fetchall()
- 
-    # Feedbacks enviados pelo aluno
-    cursor.execute('''
-        SELECT f.id_feedback,
-               f.assunto,
-               f.comentario,
-               f.anonimo,
-               f.criado_em,
-               d.nome  AS disciplina_nome,
-               d.codigo AS disciplina_codigo
-        FROM feedback f
-        JOIN disciplina d ON d.id_disciplina = f.id_disciplina
-        WHERE f.id_usuario = %s
-        ORDER BY f.criado_em DESC
-    ''', (session['usuario_id'],))
-    feedbacks = cursor.fetchall()
 
     cursor.execute('''
         SELECT 
@@ -247,7 +231,6 @@ def alunos():
     return render_template('Alunos.html',
                         disciplinas=disciplinas,
                         professores=professores,
-                        feedbacks=feedbacks,
                         conversas=conversas)
  
  
@@ -272,25 +255,7 @@ def professores():
         ORDER BY d.nome
     ''', (session['usuario_id'],))
     disciplinas = cursor.fetchall()
- 
-    # Feedbacks recebidos nas disciplinas do professor
-    cursor.execute('''
-        SELECT f.id_feedback,
-               f.assunto,
-               f.comentario,
-               f.anonimo,
-               f.criado_em,
-               d.nome  AS disciplina_nome,
-               d.codigo AS disciplina_codigo,
-               CASE WHEN f.anonimo = TRUE THEN 'Anônimo'
-                    ELSE u.nome END AS aluno_nome
-        FROM feedback f
-        JOIN disciplina d ON d.id_disciplina = f.id_disciplina
-        JOIN usuario    u ON u.id_usuario    = f.id_usuario
-        WHERE d.id_professor = %s
-        ORDER BY f.criado_em DESC
-    ''', (session['usuario_id'],))
-    feedbacks = cursor.fetchall()
+
 
     cursor.execute('''
         SELECT DISTINCT u.id_usuario, u.nome, u.identificacao
@@ -340,7 +305,6 @@ def professores():
  
     return render_template('Professores.html',
                            disciplinas=disciplinas,
-                           feedbacks=feedbacks,
                            alunos=alunos,
                            conversas=conversas)
 
