@@ -26,6 +26,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (campoId && hintTipo) {
         const regexMatricula = /^20\d{2}1[A-Z]{2}\.[A-Z]{3}_I0\d{3}$/;
         const regexSiape     = /^\d{7,8}$/;
+    
 
         campoId.addEventListener('input', function () {
             const val = this.value.trim();
@@ -39,6 +40,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 hintTipo.className = 'hint-tipo hint-valido';
             } else if (regexSiape.test(val)) {
                 hintTipo.textContent = '✓ SIAPE de professor reconhecido';
+                hintTipo.className = 'hint-tipo hint-valido';
+            } else if (regexAdmin.test(val)) {
+                hintTipo.textContent = '✓ Identificação de administrador reconhecida';
                 hintTipo.className = 'hint-tipo hint-valido';
             } else {
                 hintTipo.textContent = '✗ Formato inválido';
@@ -99,6 +103,8 @@ document.addEventListener('DOMContentLoaded', function () {
             setTimeout(() => alerta.remove(), 500);
         }, 4000);
     });
+
+
     const chatPanel = document.getElementById('chat-panel');
     if (chatPanel && typeof io !== 'undefined') {
         const socket = io();
@@ -228,6 +234,120 @@ document.addEventListener('DOMContentLoaded', function () {
         const overlay = document.getElementById('chat-overlay');
         if (overlay) overlay.addEventListener('click', fecharChat);
     }
+      
     
-});
+  function configurarDropdown(btnId, listaId, inputTextoId, inputHiddenId, classeItem) {
+    const btn = document.getElementById(btnId);
+    const lista = document.getElementById(listaId);
+    const inputTexto = document.getElementById(inputTextoId);
+    const inputHidden = document.getElementById(inputHiddenId);
 
+    // Abre / fecha ao clicar no botão
+    btn.addEventListener('click', function () {
+        lista.style.display = lista.style.display === 'none' ? 'block' : 'none';
+    });
+
+    // Delegação de evento: um único listener no elemento pai (lista),
+    // funciona para itens atuais E para itens adicionados depois
+    lista.addEventListener('click', function (evento) {
+        const item = evento.target.closest('.' + classeItem);
+        if (!item || !lista.contains(item)) return;
+
+        evento.preventDefault();
+
+        inputTexto.value = item.textContent.trim();
+        inputHidden.value = item.getAttribute('data-id');
+
+        lista.style.display = 'none';
+    });
+    lista.addEventListener('click', function (evento) {
+        const item = evento.target.closest('.' + classeItem);
+        if (!item || !lista.contains(item)) return;
+
+        evento.preventDefault();
+
+        inputTexto.value = item.textContent.trim();
+        inputHidden.value = item.getAttribute('data-id');
+
+        lista.style.display = 'none';
+    });
+
+    // Fecha ao clicar fora
+    window.addEventListener('click', function (evento) {
+        if (!btn.contains(evento.target) && !lista.contains(evento.target)) {
+            lista.style.display = 'none';
+        }
+    });
+}
+    // Dropdown de alterar - Curso
+    configurarDropdown(
+        'btn-alterar-curso',
+        'lista-dropdown-curso',
+        'input-editar-curso-nome',
+        'input-id-curso',
+        'item-curso'
+    );
+
+    // Dropdown de excluir - Curso
+    configurarDropdown(
+        'btn-excluir-curso',
+        'lista-dropdown-excluir-curso',
+        'input-excluir-curso',
+        'input-id-excluir-curso',
+        'item-excluir-curso'
+    );
+
+    // Dropdown de alterar - Período
+    configurarDropdown(
+        'btn-alterar-periodo',
+        'lista-dropdown-periodo',
+        'input-editar-periodo-inicio',
+        'input-id-periodo',
+        'item-periodo'
+    );
+
+    // Dropdown de excluir - Período
+    configurarDropdown(
+        'btn-excluir-periodo',
+        'lista-dropdown-excluir-periodo',
+        'input-excluir-periodo',
+        'input-id-excluir-periodo',
+        'item-excluir-periodo'
+    );
+
+    // Dropdown de alterar - Aluno
+    configurarDropdown(
+        'btn-alterar-aluno',
+        'lista-dropdown-aluno',
+        'Insert-matricula-alterar',
+        'input-id-aluno',
+        'item-aluno'
+    );
+
+    // Dropdown de excluir - Aluno
+    configurarDropdown(
+        'btn-excluir-aluno',
+        'lista-dropdown-excluir-aluno',
+        'Insert-matricula-excluir',
+        'input-id-excluir-aluno',
+        'item-excluir-aluno'
+    );
+
+    // Dropdown de alterar - Professor
+    configurarDropdown(
+        'btn-alterar-professor',
+        'lista-dropdown-professor',
+        'insert-id-professor-alterar',
+        'input-id-professor',
+        'item-professor'
+    );
+
+    // Dropdown de excluir - Professor
+    configurarDropdown(
+        'btn-excluir-professor',
+        'lista-dropdown-excluir-professor',
+        'insert-id-professor-excluir',
+        'input-id-excluir-professor',
+        'item-excluir-professor'
+    );
+});

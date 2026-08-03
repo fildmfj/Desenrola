@@ -1,9 +1,9 @@
+from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 import mysql.connector
 import hashlib
 import re
 from flask_socketio import SocketIO, emit, join_room
-
 app = Flask(__name__)
 app.secret_key = 'f01e5011b1c1ff3e0a556e0d607eca775021a2e1d0ec19626e225a00b4b85dc9'
 socketio = SocketIO(app)
@@ -12,7 +12,7 @@ socketio = SocketIO(app)
 DB_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': '',
+    'password': 'root',
     'database': 'desenrola',
     'charset': 'utf8mb4'
 }
@@ -28,12 +28,15 @@ def hash_senha(senha):
 # Validação de usuário e identificação do tipo
 MATRICULA = re.compile(r'^20\d{2}1[A-Z]{2}\.[A-Z]{3}_I0\d{3}$')
 SIAPE = re.compile(r'^\d{7,8}$')
+ADMIN = re.compile(r'^ADM_00\d{1}$')
 
 def detectar_tipo(identi):
     if MATRICULA.match(identi):
         return 'aluno'
     if SIAPE.match(identi):
         return 'professor'
+    if ADMIN.match(identi):
+        return 'admin'
     return None
 
 # Rotas
@@ -41,12 +44,7 @@ def detectar_tipo(identi):
 @app.route('/')
 def inicio():
     return render_template('InicioSite.html')
-    # if 'usuario_id' not in session:
-    #     return redirect(url_for('login'))
-    # if session.get('tipo') == 'aluno':
-    #     return redirect(url_for('alunos'))
-    # else:
-    #     return render_template('professores.html')
+    
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -76,11 +74,228 @@ def login():
             session['nome'] = usuario['nome'] or usuario['identificacao']
             if session['tipo'] == 'aluno':
                 return redirect(url_for('alunos'))
-            else:
+            elif session['tipo'] == 'professor':
                 return redirect(url_for('professores'))
+            elif session['tipo'] == 'adm':
+                return redirect(url_for('adm'))
+            else:
+                flash('Tipo de usuário desconhecido.', 'erro')
         else: 
             flash('Usuário ou senha incorretos.', 'erro')
     return render_template('Login.html')
+
+@app.route('/adm', methods=['GET', 'POST'])
+def adm():
+    if 'usuario_id' not in session or session.get('tipo') != 'adm':
+        flash('Acesso restrito.', 'erro')
+        return redirect(url_for('login'))
+    
+    conn = get_db()
+    cursor = conn.cursor(dictionary=True)
+    
+    
+    if request.method == 'POST':
+        botao = request.form.get("btn")
+
+    try:
+        
+        if botao == "adicionar_curso":
+            nome_curso = request.form.get('nome_curso', '').strip()
+            sigla_curso = request.form.get('sigla_curso', '').strip()
+            if sigla_curso == "" or nome_curso == "":
+                flash(f'Nome e sigla do curso não podem ser vazios.', 'danger')
+            else:
+                cursor.execute("SELECT * FROM curso WHERE nome = %s", (nome_curso,))
+                if cursor.fetchone():
+                    flash(f'Curso já existe.', 'danger')
+                else:
+                    cursor.execute(
+                        "INSERT INTO curso (nome, sigla) VALUES (%s, %s)",
+                        (nome_curso, sigla_curso)
+                    )
+                    conn.commit()
+                    flash('Curso adicionado com sucesso!', 'success')
+
+        elif botao == "alterar_curso":
+            curso_id  = request.form.get('curso_id')
+            novo_nome = request.form.get('novo_nome', '').strip()
+            nova_sigla = request.form.get('nova_sigla', '').strip()
+
+            cursor.execute(
+                "UPDATE curso SET nome=%s, sigla=%s WHERE id_curso=%s",
+                (novo_nome, nova_sigla, curso_id)
+            )
+            conn.commit()
+            flash('Curso alterado com sucesso!', 'success')
+
+        elif botao == "deletar_curso":
+            excluir_sigla = request.form.get('excluir_sigla', '').strip()
+
+            cursor.execute("DELETE FROM curso WHERE sigla=%s", (excluir_sigla,))
+            conn.commit()
+            flash('Curso deletado com sucesso!', 'success')
+
+        elif botao == "adicionar_periodo":
+            inicio_periodo = request.form.get('inicio_periodo', '').strip()
+            fim_periodo = request.form.get('fim_periodo', '').strip()
+            descricao = request.form.get('descricao', '').strip()
+            if inicio_periodo == "" or fim_periodo == "" or descricao == "":
+                flash(f'Datas do período não podem ser vazias.', 'danger')
+            else:
+                try:
+                    # Converte de DD/MM/AAAA (formato brasileiro) para AAAA-MM-DD (formato americano)
+                    inicio_periodo_us = datetime.strptime(inicio_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
+                    fim_periodo_us = datetime.strptime(fim_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
+                except ValueError as e:
+                    flash(f'{e} Formato de data inválido. Use DD/MM/AAAA.', 'danger')
+                else:
+                    cursor.execute("SELECT * FROM periodo WHERE data_inicio = %s AND data_fim = %s", (inicio_periodo_us, fim_periodo_us))
+                    if cursor.fetchone():
+                        flash(f'Período já existe.', 'danger')
+                    else:
+                        cursor.execute(
+                            "INSERT INTO periodo (data_inicio, data_fim, descricao) VALUES (%s, %s, %s)",
+                            (inicio_periodo_us, fim_periodo_us, descricao)
+                        )
+                        conn.commit()
+                        flash('Período adicionado com sucesso!', 'success')
+
+        elif botao == "alterar_periodo":
+            nova_data_inicio = request.form.get('nova_data_inicio', '').strip()
+            nova_data_fim = request.form.get('nova_data_fim', '').strip()
+            nova_descricao = request.form.get('nova_descricao', '').strip()
+            periodo_id = request.form.get('periodo_id')
+            if nova_data_inicio == "" or nova_data_fim == "" or nova_descricao == "":
+                flash(f'Datas do período não podem ser vazias.', 'danger')
+            else:
+                cursor.execute(
+                    "UPDATE periodo SET data_inicio=%s, data_fim=%s, descricao=%s WHERE id_periodo=%s",
+                    (nova_data_inicio, nova_data_fim, nova_descricao, periodo_id)
+                )
+                conn.commit()
+                flash('Período alterado com sucesso!', 'success')
+
+        elif botao == "deletar_periodo":
+            excluir_periodo = request.form.get('excluir_periodo', '').strip()
+            if excluir_periodo == "":
+                flash(f'Datas do período não podem ser vazias.', 'danger')
+            else:
+                cursor.execute("DELETE FROM periodo WHERE data_inicio=%s", (excluir_periodo,))
+                conn.commit()
+                flash('Período deletado com sucesso!', 'success')
+
+        elif botao == "adicionar_aluno":
+            matricula_aluno = request.form.get('matricula_aluno', '').strip()
+            nome_aluno = request.form.get('nome_aluno', '').strip()
+            email_aluno = request.form.get('email_aluno', '').strip()
+            senha_aluno = request.form.get('senha_aluno', '').strip()
+
+            if matricula_aluno == "" or nome_aluno == "" or email_aluno == "" or senha_aluno == "":
+                flash(f'Todos os campos devem ser preenchidos.', 'danger')
+            else:
+                cursor.execute("SELECT * FROM usuario WHERE identificacao = %s", (matricula_aluno,))
+                if cursor.fetchall():
+                    flash(f'Aluno já existe.', 'danger')
+                else:
+                    cursor.execute(
+                        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
+                        (matricula_aluno, 'aluno', nome_aluno, email_aluno, hash_senha(senha_aluno))
+                    )
+                    conn.commit()
+                    flash('Aluno adicionado com sucesso!', 'success')
+
+        elif botao == "alterar_aluno":
+            matricula_aluno = request.form.get('matricula_aluno', '').strip()
+            nome_aluno = request.form.get('nome_aluno', '').strip()
+            email_aluno = request.form.get('email_aluno', '').strip()
+            senha_aluno = request.form.get('senha_aluno', '').strip()
+            id_usuario = request.form.get('id_usuario', '')
+
+            if matricula_aluno == "" or nome_aluno == "" or email_aluno == "" or senha_aluno == "":
+                flash(f'Todos os campos devem ser preenchidos.', 'danger')
+            else:
+                cursor.execute(
+                    "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
+                    (matricula_aluno, nome_aluno, email_aluno, hash_senha(senha_aluno), id_usuario)
+                )
+                conn.commit()
+                flash('Aluno alterado com sucesso!', 'success')
+
+        elif botao == "deletar_aluno":
+            matricula_aluno = request.form.get('matricula_aluno', '').strip()
+            if matricula_aluno == "":
+                flash(f'Matrícula do aluno não pode ser vazia.', 'danger')
+            else:
+                cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (matricula_aluno,))
+                conn.commit()
+                flash('Aluno deletado com sucesso!', 'success')
+
+        elif botao == "adicionar_professor":
+            siape_professor = request.form.get('siape_professor','').strip()
+            nome_professor = request.form.get('nome_professor','').strip()
+            email_professor = request.form.get('email_professor', '').strip()
+            senha_professor = request.form.get('senha_professor', '').strip()
+            id_usuario = request.form.get('id_usuario', '')
+
+            if siape_professor == "" or nome_professor == "" or email_professor == "" or senha_professor == "":
+                flash(f"Todos os campos devem estar preenchidos.", 'danger')
+            else:
+                cursor.execute(
+                    "SELECT * FROM usuario WHERE identificacao = %s", (siape_professor,)
+                )
+                if cursor.fetchone():
+                    flash(f'Professor já existe.', 'danger')
+                else:
+                    cursor.execute(
+                        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
+                        (siape_professor, 'professor', nome_professor, email_professor, hash_senha(senha_professor))
+                    )
+                    conn.commit()
+                    flash('Professor adicionado com sucesso!', 'success')
+                    
+        elif botao == "alterar_professor":
+            siape_professor = request.form.get('siape_professor','').strip()
+            nome_professor = request.form.get('nome_professor','').strip()
+            email_professor = request.form.get('email_professor', '').strip()
+            senha_professor = request.form.get('senha_professor', '').strip()
+            id_usuario = request.form.get('id_usuario', '')
+
+            if siape_professor == "" or nome_professor == "" or email_professor == "" or senha_professor == "":
+                flash(f"Todos os campos devem estar preenchidos.", 'danger')
+            else:
+                cursor.execute(
+                    "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
+                    (siape_professor, nome_professor, email_professor, hash_senha(senha_professor), id_usuario)
+                )
+                conn.commit()
+                flash('Professor alterado com sucesso!', 'success')
+
+        elif botao == "deletar_professor":
+            siape_professor = request.form.get('siape_professor','').strip()
+            if siape_professor == "":
+                flash(f'SIAPE do professor não pode ser vazio.', 'danger')
+            else:
+                cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (siape_professor,))
+                conn.commit()
+                flash('Professor deletado com sucesso!', 'success')
+
+    except Exception as e:
+        conn.rollback()
+        flash(f'Erro: {e}. Tente novamente.', 'danger')
+        
+    cursor.execute("SELECT id_curso, nome, sigla FROM curso")
+    lista_cursos = cursor.fetchall()
+    cursor.execute("SELECT id_periodo, data_inicio, data_fim FROM periodo ")
+    lista_periodo = cursor.fetchall()
+    cursor.execute("SELECT id_usuario, identificacao FROM usuario WHERE tipo='aluno'")
+    lista_alunos = cursor.fetchall()
+    cursor.execute("SELECT id_usuario, identificacao FROM usuario WHERE tipo='professor'")
+    lista_professores = cursor.fetchall()
+
+    return render_template('ADM.html', cursos=lista_cursos,
+                            periodos=lista_periodo,
+                            alunos=lista_alunos,
+                            professores=lista_professores)
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
@@ -160,78 +375,79 @@ def alunos():
     cursor = conn.cursor(dictionary=True)
  
     # Disciplinas matriculadas pelo aluno (com curso e professor)
-    cursor.execute('''
-        SELECT d.nome,
-            d.codigo,
-            c.nome  AS curso_nome,
-            c.sigla AS curso_sigla,
-            u.nome  AS professor_nome,
-            p.descricao AS periodo_descricao,
-            m.situacao
-        FROM matricula_disciplina m
-        JOIN disciplina d  ON d.id_disciplina = m.id_disciplina
-        JOIN curso      c  ON c.id_curso      = d.id_curso
-        JOIN usuario    u  ON u.id_usuario    = d.id_professor
-        JOIN periodo    p  ON p.id_periodo    = m.id_periodo
-        WHERE m.id_aluno = %s
-        ORDER BY p.data_inicio DESC, d.nome
-    ''', (session['usuario_id'],))
-    disciplinas = cursor.fetchall()
+    # cursor.execute('''
+    #     SELECT d.nome,
+    #         d.codigo,
+    #         c.nome  AS curso_nome,
+    #         c.sigla AS curso_sigla,
+    #         u.nome  AS professor_nome,
+    #         p.descricao AS periodo_descricao,
+    #         m.situacao
+    #     FROM matricula_disciplina m
+    #     JOIN disciplina d  ON d.id_disciplina = m.id_disciplina
+    #     JOIN curso      c  ON c.id_curso      = d.id_curso
+    #     JOIN usuario    u  ON u.id_usuario    = d.id_professor
+    #     JOIN periodo    p  ON p.id_periodo    = m.id_periodo
+    #     WHERE m.id_aluno = %s
+    #     ORDER BY p.data_inicio DESC, d.nome
+    # ''', (session['usuario_id'],))
+    # disciplinas = cursor.fetchall()
  
-    # Professores das disciplinas do aluno (sem repetição)
-    cursor.execute('''
-        SELECT DISTINCT u.id_usuario,
-                        u.nome,
-                        u.identificacao,
-                        u.email
-        FROM usuario u
-        JOIN disciplina d          ON d.id_professor  = u.id_usuario
-        JOIN matricula_disciplina m ON m.id_disciplina = d.id_disciplina
-        WHERE m.id_aluno = %s
-        ORDER BY u.nome
-    ''', (session['usuario_id'],))
-    professores = cursor.fetchall()
+    # # Professores das disciplinas do aluno (sem repetição)
+    # cursor.execute('''
+    #     SELECT DISTINCT u.id_usuario,
+    #                     u.nome,
+    #                     u.identificacao,
+    #                     u.email
+    #     FROM usuario u
+    #     JOIN disciplina d          ON d.id_professor  = u.id_usuario
+    #     JOIN matricula_disciplina m ON m.id_disciplina = d.id_disciplina
+    #     WHERE m.id_aluno = %s
+    #     ORDER BY u.nome
+    # ''', (session['usuario_id'],))
+    # professores = cursor.fetchall()
 
-    cursor.execute('''
-        SELECT 
-            u.id_usuario, u.nome, u.identificacao,
-            MAX(m.criado_em) AS ultima_mensagem,
-            (SELECT CONCAT(
-                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
-                m2.conteudo
-            ) FROM mensagem m2
-            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
-            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
-                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
-            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
-        FROM mensagem m
-        JOIN usuario u ON u.id_usuario = CASE
-            WHEN m.id_remetente = %s THEN m.id_destinatario
-            ELSE m.id_remetente
-        END
-        WHERE m.id_remetente = %s OR m.id_destinatario = %s
-        GROUP BY u.id_usuario, u.nome, u.identificacao
-        ORDER BY ultima_mensagem DESC
-    ''', (
-        session['usuario_id'],  # CASE do CONCAT
-        session['usuario_id'],  # id_remetente do WHERE interno
-        session['usuario_id'],  # id_destinatario do WHERE interno
-        session['usuario_id'],  # CASE do JOIN externo
-        session['usuario_id'],  # WHERE externo remetente
-        session['usuario_id'],  # WHERE externo destinatario
-    ))
-    conversas = cursor.fetchall()
+    # cursor.execute('''
+    #     SELECT 
+    #         u.id_usuario, u.nome, u.identificacao,
+    #         MAX(m.criado_em) AS ultima_mensagem,
+    #         (SELECT CONCAT(
+    #             CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+    #             m2.conteudo
+    #         ) FROM mensagem m2
+    #         JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+    #         WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+    #             OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+    #         ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+    #     FROM mensagem m
+    #     JOIN usuario u ON u.id_usuario = CASE
+    #         WHEN m.id_remetente = %s THEN m.id_destinatario
+    #         ELSE m.id_remetente
+    #     END
+    #     WHERE m.id_remetente = %s OR m.id_destinatario = %s
+    #     GROUP BY u.id_usuario, u.nome, u.identificacao
+    #     ORDER BY ultima_mensagem DESC
+    # ''', (
+    #     session['usuario_id'],  # CASE do CONCAT
+    #     session['usuario_id'],  # id_remetente do WHERE interno
+    #     session['usuario_id'],  # id_destinatario do WHERE interno
+    #     session['usuario_id'],  # CASE do JOIN externo
+    #     session['usuario_id'],  # WHERE externo remetente
+    #     session['usuario_id'],  # WHERE externo destinatario
+    # ))
+    # conversas = cursor.fetchall()
 
-    for c in conversas:
-        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
+    # for c in conversas:
+    #     c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
-    cursor.close()
-    conn.close()
+    # cursor.close()
+    # conn.close()
  
-    return render_template('Alunos.html',
-                        disciplinas=disciplinas,
-                        professores=professores,
-                        conversas=conversas)
+    return render_template('Alunos.html'
+                        # disciplinas=disciplinas,
+                        # professores=professores,
+                        # conversas=conversas
+                        )
  
  
 @app.route('/professores')
@@ -243,70 +459,71 @@ def professores():
     cursor = conn.cursor(dictionary=True)
  
     # Disciplinas lecionadas pelo professor (com curso)
-    cursor.execute('''
-        SELECT d.id_disciplina,
-               d.nome,
-               d.codigo,
-               c.nome  AS curso_nome,
-               c.sigla AS curso_sigla
-        FROM disciplina d
-        JOIN curso c ON c.id_curso = d.id_curso
-        WHERE d.id_professor = %s
-        ORDER BY d.nome
-    ''', (session['usuario_id'],))
-    disciplinas = cursor.fetchall()
+    # cursor.execute('''
+    #     SELECT d.id_disciplina,
+    #            d.nome,
+    #            d.codigo,
+    #            c.nome  AS curso_nome,
+    #            c.sigla AS curso_sigla
+    #     FROM disciplina d
+    #     JOIN curso c ON c.id_curso = d.id_curso
+    #     WHERE d.id_professor = %s
+    #     ORDER BY d.nome
+    # ''', (session['usuario_id'],))
+    # disciplinas = cursor.fetchall()
 
 
-    cursor.execute('''
-        SELECT DISTINCT u.id_usuario, u.nome, u.identificacao
-        FROM usuario u
-        JOIN matricula_disciplina m ON m.id_aluno = u.id_usuario
-        JOIN disciplina d ON d.id_disciplina = m.id_disciplina
-        WHERE d.id_professor = %s
-        ORDER BY u.nome
-    ''', (session['usuario_id'],))
-    alunos = cursor.fetchall()
+    # cursor.execute('''
+    #     SELECT DISTINCT u.id_usuario, u.nome, u.identificacao
+    #     FROM usuario u
+    #     JOIN matricula_disciplina m ON m.id_aluno = u.id_usuario
+    #     JOIN disciplina d ON d.id_disciplina = m.id_disciplina
+    #     WHERE d.id_professor = %s
+    #     ORDER BY u.nome
+    # ''', (session['usuario_id'],))
+    # alunos = cursor.fetchall()
 
-    # Conversas — últimas mensagens por aluno
-    cursor.execute('''
-        SELECT 
-            u.id_usuario, u.nome, u.identificacao,
-            MAX(m.criado_em) AS ultima_mensagem,
-            (SELECT CONCAT(
-                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
-                m2.conteudo
-            ) FROM mensagem m2
-            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
-            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
-                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
-            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
-        FROM mensagem m
-        JOIN usuario u ON u.id_usuario = CASE
-            WHEN m.id_remetente = %s THEN m.id_destinatario
-            ELSE m.id_remetente
-        END
-        WHERE m.id_remetente = %s OR m.id_destinatario = %s
-        GROUP BY u.id_usuario, u.nome, u.identificacao
-        ORDER BY ultima_mensagem DESC
-    ''', (
-        session['usuario_id'],  # CASE do CONCAT
-        session['usuario_id'],  # id_remetente do WHERE interno
-        session['usuario_id'],  # id_destinatario do WHERE interno
-        session['usuario_id'],  # CASE do JOIN externo
-        session['usuario_id'],  # WHERE externo remetente
-        session['usuario_id'],  # WHERE externo destinatario
-    ))
-    conversas = cursor.fetchall()
-    for c in conversas:
-        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
+    # # Conversas — últimas mensagens por aluno
+    # cursor.execute('''
+    #     SELECT 
+    #         u.id_usuario, u.nome, u.identificacao,
+    #         MAX(m.criado_em) AS ultima_mensagem,
+    #         (SELECT CONCAT(
+    #             CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+    #             m2.conteudo
+    #         ) FROM mensagem m2
+    #         JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+    #         WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+    #             OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+    #         ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+    #     FROM mensagem m
+    #     JOIN usuario u ON u.id_usuario = CASE
+    #         WHEN m.id_remetente = %s THEN m.id_destinatario
+    #         ELSE m.id_remetente
+    #     END
+    #     WHERE m.id_remetente = %s OR m.id_destinatario = %s
+    #     GROUP BY u.id_usuario, u.nome, u.identificacao
+    #     ORDER BY ultima_mensagem DESC
+    # ''', (
+    #     session['usuario_id'],  # CASE do CONCAT
+    #     session['usuario_id'],  # id_remetente do WHERE interno
+    #     session['usuario_id'],  # id_destinatario do WHERE interno
+    #     session['usuario_id'],  # CASE do JOIN externo
+    #     session['usuario_id'],  # WHERE externo remetente
+    #     session['usuario_id'],  # WHERE externo destinatario
+    # ))
+    # conversas = cursor.fetchall()
+    # for c in conversas:
+    #     c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
-    cursor.close()
-    conn.close()
+    # cursor.close()
+    # conn.close()
  
-    return render_template('Professores.html',
-                           disciplinas=disciplinas,
-                           alunos=alunos,
-                           conversas=conversas)
+    return render_template('Professores.html'
+    #                        disciplinas=disciplinas,
+    #                        alunos=alunos,
+    #                        conversas=conversas
+                          )
 
 @app.route('/termos')
 def termos():

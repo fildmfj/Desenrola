@@ -249,8 +249,8 @@ a { text-decoration: none; }
     margin: 0 auto;
 }
 
-.secao { display: none; }
-.secao.ativo { display: block; }
+.secao, .alerta { display: none; }
+.secao.ativo, .cursos { display: block; }
 
 .secao h2 {
     color: var(--verde);
