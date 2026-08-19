@@ -12,7 +12,7 @@ socketio = SocketIO(app)
 DB_config = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'root',
+    'password': '',
     'database': 'desenrola',
     'charset': 'utf8mb4'
 }
@@ -375,78 +375,79 @@ def alunos():
     cursor = conn.cursor(dictionary=True)
  
     # Disciplinas matriculadas pelo aluno (com curso e professor)
-    # cursor.execute('''
-    #     SELECT d.nome,
-    #         d.codigo,
-    #         c.nome  AS curso_nome,
-    #         c.sigla AS curso_sigla,
-    #         u.nome  AS professor_nome,
-    #         p.descricao AS periodo_descricao,
-    #         m.situacao
-    #     FROM matricula_disciplina m
-    #     JOIN disciplina d  ON d.id_disciplina = m.id_disciplina
-    #     JOIN curso      c  ON c.id_curso      = d.id_curso
-    #     JOIN usuario    u  ON u.id_usuario    = d.id_professor
-    #     JOIN periodo    p  ON p.id_periodo    = m.id_periodo
-    #     WHERE m.id_aluno = %s
-    #     ORDER BY p.data_inicio DESC, d.nome
-    # ''', (session['usuario_id'],))
-    # disciplinas = cursor.fetchall()
+    cursor.execute('''
+        SELECT d.nome,
+            d.codigo,
+            c.nome  AS curso_nome,
+            c.sigla AS curso_sigla,
+            u.nome  AS professor_nome,
+            p.descricao AS periodo_descricao,
+            m.situacao
+        FROM matricula_disciplina m
+        JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = m.id_disciplina
+        JOIN disciplina d  ON d.id_disciplina  = dp.id_disciplina
+        JOIN curso      c  ON c.id_curso       = d.id_curso
+        JOIN usuario    u  ON u.id_usuario     = dp.id_professor
+        JOIN periodo    p  ON p.id_periodo     = dp.id_periodo
+        WHERE m.id_aluno = %s
+        ORDER BY p.data_inicio DESC, d.nome
+    ''', (session['usuario_id'],))
+    disciplinas = cursor.fetchall()
  
-    # # Professores das disciplinas do aluno (sem repetição)
-    # cursor.execute('''
-    #     SELECT DISTINCT u.id_usuario,
-    #                     u.nome,
-    #                     u.identificacao,
-    #                     u.email
-    #     FROM usuario u
-    #     JOIN disciplina d          ON d.id_professor  = u.id_usuario
-    #     JOIN matricula_disciplina m ON m.id_disciplina = d.id_disciplina
-    #     WHERE m.id_aluno = %s
-    #     ORDER BY u.nome
-    # ''', (session['usuario_id'],))
-    # professores = cursor.fetchall()
+    # Professores das disciplinas do aluno (sem repetição)
+    cursor.execute('''
+        SELECT DISTINCT u.id_usuario,
+                        u.nome,
+                        u.identificacao,
+                        u.email
+        FROM usuario u
+        JOIN disciplina_periodo   dp ON dp.id_professor = u.id_usuario
+        JOIN matricula_disciplina m  ON m.id_disciplina = dp.id_disciplina_periodo
+        WHERE m.id_aluno = %s
+        ORDER BY u.nome
+    ''', (session['usuario_id'],))
+    professores = cursor.fetchall()
 
-    # cursor.execute('''
-    #     SELECT 
-    #         u.id_usuario, u.nome, u.identificacao,
-    #         MAX(m.criado_em) AS ultima_mensagem,
-    #         (SELECT CONCAT(
-    #             CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
-    #             m2.conteudo
-    #         ) FROM mensagem m2
-    #         JOIN usuario ur ON ur.id_usuario = m2.id_remetente
-    #         WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
-    #             OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
-    #         ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
-    #     FROM mensagem m
-    #     JOIN usuario u ON u.id_usuario = CASE
-    #         WHEN m.id_remetente = %s THEN m.id_destinatario
-    #         ELSE m.id_remetente
-    #     END
-    #     WHERE m.id_remetente = %s OR m.id_destinatario = %s
-    #     GROUP BY u.id_usuario, u.nome, u.identificacao
-    #     ORDER BY ultima_mensagem DESC
-    # ''', (
-    #     session['usuario_id'],  # CASE do CONCAT
-    #     session['usuario_id'],  # id_remetente do WHERE interno
-    #     session['usuario_id'],  # id_destinatario do WHERE interno
-    #     session['usuario_id'],  # CASE do JOIN externo
-    #     session['usuario_id'],  # WHERE externo remetente
-    #     session['usuario_id'],  # WHERE externo destinatario
-    # ))
-    # conversas = cursor.fetchall()
+    cursor.execute('''
+        SELECT 
+            u.id_usuario, u.nome, u.identificacao,
+            MAX(m.criado_em) AS ultima_mensagem,
+            (SELECT CONCAT(
+                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+                m2.conteudo
+            ) FROM mensagem m2
+            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+        FROM mensagem m
+        JOIN usuario u ON u.id_usuario = CASE
+            WHEN m.id_remetente = %s THEN m.id_destinatario
+            ELSE m.id_remetente
+        END
+        WHERE m.id_remetente = %s OR m.id_destinatario = %s
+        GROUP BY u.id_usuario, u.nome, u.identificacao
+        ORDER BY ultima_mensagem DESC
+    ''', (
+        session['usuario_id'],  # CASE do CONCAT
+        session['usuario_id'],  # id_remetente do WHERE interno
+        session['usuario_id'],  # id_destinatario do WHERE interno
+        session['usuario_id'],  # CASE do JOIN externo
+        session['usuario_id'],  # WHERE externo remetente
+        session['usuario_id'],  # WHERE externo destinatario
+    ))
+    conversas = cursor.fetchall()
 
-    # for c in conversas:
-    #     c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
+    for c in conversas:
+        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
-    # cursor.close()
-    # conn.close()
+    cursor.close()
+    conn.close()
  
-    return render_template('Alunos.html'
-                        # disciplinas=disciplinas,
-                        # professores=professores,
-                        # conversas=conversas
+    return render_template('Alunos.html',
+                        disciplinas=disciplinas,
+                        professores=professores,
+                        conversas=conversas
                         )
  
  
@@ -459,70 +460,71 @@ def professores():
     cursor = conn.cursor(dictionary=True)
  
     # Disciplinas lecionadas pelo professor (com curso)
-    # cursor.execute('''
-    #     SELECT d.id_disciplina,
-    #            d.nome,
-    #            d.codigo,
-    #            c.nome  AS curso_nome,
-    #            c.sigla AS curso_sigla
-    #     FROM disciplina d
-    #     JOIN curso c ON c.id_curso = d.id_curso
-    #     WHERE d.id_professor = %s
-    #     ORDER BY d.nome
-    # ''', (session['usuario_id'],))
-    # disciplinas = cursor.fetchall()
+    cursor.execute('''
+        SELECT d.id_disciplina,
+               d.nome,
+               d.codigo,
+               c.nome  AS curso_nome,
+               c.sigla AS curso_sigla
+        FROM disciplina d
+        JOIN disciplina_periodo dp ON dp.id_disciplina = d.id_disciplina
+        JOIN curso c ON c.id_curso = d.id_curso
+        WHERE dp.id_professor = %s
+        ORDER BY d.nome
+    ''', (session['usuario_id'],))
+    disciplinas = cursor.fetchall()
 
 
-    # cursor.execute('''
-    #     SELECT DISTINCT u.id_usuario, u.nome, u.identificacao
-    #     FROM usuario u
-    #     JOIN matricula_disciplina m ON m.id_aluno = u.id_usuario
-    #     JOIN disciplina d ON d.id_disciplina = m.id_disciplina
-    #     WHERE d.id_professor = %s
-    #     ORDER BY u.nome
-    # ''', (session['usuario_id'],))
-    # alunos = cursor.fetchall()
+    cursor.execute('''
+        SELECT DISTINCT al.id_usuario, al.nome, al.identificacao
+        FROM disciplina_periodo dp
+        JOIN matricula_disciplina m ON m.id_disciplina = dp.id_disciplina_periodo
+        JOIN usuario al ON al.id_usuario = m.id_aluno
+        WHERE dp.id_professor = %s
+        ORDER BY al.nome
+    ''', (session['usuario_id'],))
+    alunos = cursor.fetchall()
 
-    # # Conversas — últimas mensagens por aluno
-    # cursor.execute('''
-    #     SELECT 
-    #         u.id_usuario, u.nome, u.identificacao,
-    #         MAX(m.criado_em) AS ultima_mensagem,
-    #         (SELECT CONCAT(
-    #             CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
-    #             m2.conteudo
-    #         ) FROM mensagem m2
-    #         JOIN usuario ur ON ur.id_usuario = m2.id_remetente
-    #         WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
-    #             OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
-    #         ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
-    #     FROM mensagem m
-    #     JOIN usuario u ON u.id_usuario = CASE
-    #         WHEN m.id_remetente = %s THEN m.id_destinatario
-    #         ELSE m.id_remetente
-    #     END
-    #     WHERE m.id_remetente = %s OR m.id_destinatario = %s
-    #     GROUP BY u.id_usuario, u.nome, u.identificacao
-    #     ORDER BY ultima_mensagem DESC
-    # ''', (
-    #     session['usuario_id'],  # CASE do CONCAT
-    #     session['usuario_id'],  # id_remetente do WHERE interno
-    #     session['usuario_id'],  # id_destinatario do WHERE interno
-    #     session['usuario_id'],  # CASE do JOIN externo
-    #     session['usuario_id'],  # WHERE externo remetente
-    #     session['usuario_id'],  # WHERE externo destinatario
-    # ))
-    # conversas = cursor.fetchall()
-    # for c in conversas:
-    #     c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
+    # Conversas — últimas mensagens por aluno
+    cursor.execute('''
+        SELECT 
+            u.id_usuario, u.nome, u.identificacao,
+            MAX(m.criado_em) AS ultima_mensagem,
+            (SELECT CONCAT(
+                CASE WHEN m2.id_remetente = %s THEN 'Você: ' ELSE CONCAT(ur.nome, ': ') END,
+                m2.conteudo
+            ) FROM mensagem m2
+            JOIN usuario ur ON ur.id_usuario = m2.id_remetente
+            WHERE (m2.id_remetente = %s AND m2.id_destinatario = u.id_usuario)
+                OR (m2.id_remetente = u.id_usuario AND m2.id_destinatario = %s)
+            ORDER BY m2.criado_em DESC LIMIT 1) AS ultimo_texto
+        FROM mensagem m
+        JOIN usuario u ON u.id_usuario = CASE
+            WHEN m.id_remetente = %s THEN m.id_destinatario
+            ELSE m.id_remetente
+        END
+        WHERE m.id_remetente = %s OR m.id_destinatario = %s
+        GROUP BY u.id_usuario, u.nome, u.identificacao
+        ORDER BY ultima_mensagem DESC
+    ''', (
+        session['usuario_id'],  # CASE do CONCAT
+        session['usuario_id'],  # id_remetente do WHERE interno
+        session['usuario_id'],  # id_destinatario do WHERE interno
+        session['usuario_id'],  # CASE do JOIN externo
+        session['usuario_id'],  # WHERE externo remetente
+        session['usuario_id'],  # WHERE externo destinatario
+    ))
+    conversas = cursor.fetchall()
+    for c in conversas:
+        c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
  
-    # cursor.close()
-    # conn.close()
+    cursor.close()
+    conn.close()
  
-    return render_template('Professores.html'
-    #                        disciplinas=disciplinas,
-    #                        alunos=alunos,
-    #                        conversas=conversas
+    return render_template('Professores.html',
+                            disciplinas=disciplinas,
+                            alunos=alunos,
+                            conversas=conversas
                           )
 
 @app.route('/termos')
