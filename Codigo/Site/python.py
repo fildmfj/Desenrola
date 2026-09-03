@@ -4,11 +4,12 @@ import mysql.connector
 import hashlib
 import re
 from flask_socketio import SocketIO, emit, join_room
+
 app = Flask(__name__)
 app.secret_key = 'f01e5011b1c1ff3e0a556e0d607eca775021a2e1d0ec19626e225a00b4b85dc9'
 socketio = SocketIO(app)
 
-# Configuração MySQL 
+# Configuração MySQL
 DB_config = {
     'host': 'localhost',
     'user': 'root',
@@ -17,18 +18,22 @@ DB_config = {
     'charset': 'utf8mb4'
 }
 
+
 # Conexão
 def get_db():
     conn = mysql.connector.connect(**DB_config)
     return conn
 
+
 def hash_senha(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
+
 
 # Validação de usuário e identificação do tipo
 MATRICULA = re.compile(r'^20\d{2}1[A-Z]{2}\.[A-Z]{3}_I0\d{3}$')
 SIAPE = re.compile(r'^\d{7,8}$')
 ADMIN = re.compile(r'^ADM_00\d{1}$')
+
 
 def detectar_tipo(identi):
     if MATRICULA.match(identi):
@@ -39,12 +44,328 @@ def detectar_tipo(identi):
         return 'admin'
     return None
 
+
+# ──────────────────────────────────────────────────────────────
+# Handlers do painel ADM — um por ação (adicionar/alterar/deletar
+# curso, período, aluno, professor). Cada handler recebe o cursor,
+# a conexão e o form da requisição, e é responsável por validar,
+# executar a query e disparar o flash correspondente.
+# ──────────────────────────────────────────────────────────────
+
+# --- Curso ------------------------------------------------------
+
+def handle_adicionar_curso(cursor, conn, form):
+    nome_curso = form.get('nome_curso', '').strip()
+    sigla_curso = form.get('sigla_curso', '').strip()
+
+    if nome_curso == "" or sigla_curso == "":
+        flash('Nome e sigla do curso não podem ser vazios.', 'danger')
+        return
+
+    cursor.execute("SELECT * FROM curso WHERE nome = %s", (nome_curso,))
+    if cursor.fetchone():
+        flash('Curso já existe.', 'danger')
+        return
+
+    cursor.execute(
+        "INSERT INTO curso (nome, sigla) VALUES (%s, %s)",
+        (nome_curso, sigla_curso)
+    )
+    conn.commit()
+    flash('Curso adicionado com sucesso!', 'success')
+
+
+def handle_alterar_curso(cursor, conn, form):
+    curso_id = form.get('curso_id')
+    novo_nome = form.get('novo_nome', '').strip()
+    nova_sigla = form.get('nova_sigla', '').strip()
+
+    if not curso_id:
+        flash('Selecione um curso para alterar.', 'danger')
+        return
+    if novo_nome == "" or nova_sigla == "":
+        flash('Nome e sigla do curso não podem ser vazios.', 'danger')
+        return
+
+    cursor.execute(
+        "UPDATE curso SET nome=%s, sigla=%s WHERE id_curso=%s",
+        (novo_nome, nova_sigla, curso_id)
+    )
+    conn.commit()
+    flash('Curso alterado com sucesso!', 'success')
+
+
+def handle_deletar_curso(cursor, conn, form):
+    excluir_sigla = form.get('excluir_sigla', '').strip()
+
+    if excluir_sigla == "":
+        flash('Selecione um curso para excluir.', 'danger')
+        return
+
+    # Um curso pode ter disciplinas vinculadas — checa antes de tentar
+    # apagar para dar um aviso claro em vez do erro cru do MySQL.
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM disciplina WHERE id_curso = "
+        "(SELECT id_curso FROM curso WHERE sigla = %s)",
+        (excluir_sigla,)
+    )
+    vinculadas = cursor.fetchone()['total']
+    if vinculadas > 0:
+        flash(f'Não é possível excluir: existem {vinculadas} disciplina(s) vinculadas a este curso.', 'danger')
+        return
+
+    cursor.execute("DELETE FROM curso WHERE sigla=%s", (excluir_sigla,))
+    conn.commit()
+    flash('Curso deletado com sucesso!', 'success')
+
+
+# --- Período ------------------------------------------------------
+
+def handle_adicionar_periodo(cursor, conn, form):
+    inicio_periodo = form.get('inicio_periodo', '').strip()
+    fim_periodo = form.get('fim_periodo', '').strip()
+    descricao = form.get('descricao', '').strip()
+
+    if inicio_periodo == "" or fim_periodo == "" or descricao == "":
+        flash('Datas do período não podem ser vazias.', 'danger')
+        return
+
+    try:
+        # Converte de DD/MM/AAAA (formato brasileiro) para AAAA-MM-DD (formato americano)
+        inicio_periodo_us = datetime.strptime(inicio_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
+        fim_periodo_us = datetime.strptime(fim_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
+    except ValueError as e:
+        flash(f'{e} Formato de data inválido. Use DD/MM/AAAA.', 'danger')
+        return
+
+    cursor.execute(
+        "SELECT * FROM periodo WHERE data_inicio = %s AND data_fim = %s",
+        (inicio_periodo_us, fim_periodo_us)
+    )
+    if cursor.fetchone():
+        flash('Período já existe.', 'danger')
+        return
+
+    cursor.execute(
+        "INSERT INTO periodo (data_inicio, data_fim, descricao) VALUES (%s, %s, %s)",
+        (inicio_periodo_us, fim_periodo_us, descricao)
+    )
+    conn.commit()
+    flash('Período adicionado com sucesso!', 'success')
+
+
+def handle_alterar_periodo(cursor, conn, form):
+    periodo_id = form.get('periodo_id')
+    nova_data_inicio = form.get('nova_data_inicio', '').strip()
+    nova_data_fim = form.get('nova_data_fim', '').strip()
+    nova_descricao = form.get('nova_descricao', '').strip()
+
+    if not periodo_id:
+        flash('Selecione um período para alterar.', 'danger')
+        return
+    if nova_data_inicio == "" or nova_data_fim == "" or nova_descricao == "":
+        flash('Datas do período não podem ser vazias.', 'danger')
+        return
+
+    try:
+        nova_data_inicio_us = datetime.strptime(nova_data_inicio, '%d/%m/%Y').strftime('%Y-%m-%d')
+        nova_data_fim_us = datetime.strptime(nova_data_fim, '%d/%m/%Y').strftime('%Y-%m-%d')
+    except ValueError as e:
+        flash(f'{e} Formato de data inválido. Use DD/MM/AAAA.', 'danger')
+        return
+
+    cursor.execute(
+        "UPDATE periodo SET data_inicio=%s, data_fim=%s, descricao=%s WHERE id_periodo=%s",
+        (nova_data_inicio_us, nova_data_fim_us, nova_descricao, periodo_id)
+    )
+    conn.commit()
+    flash('Período alterado com sucesso!', 'success')
+
+
+def handle_deletar_periodo(cursor, conn, form):
+    periodo_id = form.get('periodo_id')
+
+    if not periodo_id:
+        flash('Selecione um período para excluir.', 'danger')
+        return
+
+    # Um período pode ter disciplinas vinculadas (disciplina_periodo),
+    # que por sua vez podem ter alunos matriculados. Checa antes de
+    # apagar para não estourar a foreign key com um erro cru do MySQL.
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM disciplina_periodo WHERE id_periodo = %s",
+        (periodo_id,)
+    )
+    vinculadas = cursor.fetchone()['total']
+    if vinculadas > 0:
+        flash(f'Não é possível excluir: existem {vinculadas} disciplina(s) vinculadas a este período.', 'danger')
+        return
+
+    cursor.execute("DELETE FROM periodo WHERE id_periodo=%s", (periodo_id,))
+    conn.commit()
+    flash('Período deletado com sucesso!', 'success')
+
+
+# --- Aluno ------------------------------------------------------
+
+def handle_adicionar_aluno(cursor, conn, form):
+    matricula_aluno = form.get('matricula_aluno', '').strip()
+    nome_aluno = form.get('nome_aluno', '').strip()
+    email_aluno = form.get('email_aluno', '').strip()
+    senha_aluno = form.get('senha_aluno', '').strip()
+
+    if not all([matricula_aluno, nome_aluno, email_aluno, senha_aluno]):
+        flash('Todos os campos devem ser preenchidos.', 'danger')
+        return
+
+    cursor.execute("SELECT * FROM usuario WHERE identificacao = %s", (matricula_aluno,))
+    if cursor.fetchone():
+        flash('Aluno já existe.', 'danger')
+        return
+
+    cursor.execute(
+        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
+        (matricula_aluno, 'aluno', nome_aluno, email_aluno, hash_senha(senha_aluno))
+    )
+    conn.commit()
+    flash('Aluno adicionado com sucesso!', 'success')
+
+
+def handle_alterar_aluno(cursor, conn, form):
+    id_usuario = form.get('id_usuario', '')
+    matricula_aluno = form.get('matricula_aluno', '').strip()
+    nome_aluno = form.get('nome_aluno', '').strip()
+    email_aluno = form.get('email_aluno', '').strip()
+    senha_aluno = form.get('senha_aluno', '').strip()
+
+    if not id_usuario:
+        flash('Selecione um aluno para alterar.', 'danger')
+        return
+    if matricula_aluno == "" or nome_aluno == "" or email_aluno == "":
+        flash('Matrícula, nome e email não podem ser vazios.', 'danger')
+        return
+
+    # Senha só é atualizada se o campo vier preenchido — evita
+    # sobrescrever a senha do aluno com o hash de uma string vazia.
+    if senha_aluno:
+        cursor.execute(
+            "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
+            (matricula_aluno, nome_aluno, email_aluno, hash_senha(senha_aluno), id_usuario)
+        )
+    else:
+        cursor.execute(
+            "UPDATE usuario SET identificacao=%s, nome=%s, email=%s WHERE id_usuario=%s",
+            (matricula_aluno, nome_aluno, email_aluno, id_usuario)
+        )
+    conn.commit()
+    flash('Aluno alterado com sucesso!', 'success')
+
+
+def handle_deletar_aluno(cursor, conn, form):
+    matricula_aluno = form.get('matricula_aluno', '').strip()
+
+    if matricula_aluno == "":
+        flash('Matrícula do aluno não pode ser vazia.', 'danger')
+        return
+
+    cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (matricula_aluno,))
+    conn.commit()
+    flash('Aluno deletado com sucesso!', 'success')
+
+
+# --- Professor ------------------------------------------------------
+
+def handle_adicionar_professor(cursor, conn, form):
+    siape_professor = form.get('siape_professor', '').strip()
+    nome_professor = form.get('nome_professor', '').strip()
+    email_professor = form.get('email_professor', '').strip()
+    senha_professor = form.get('senha_professor', '').strip()
+
+    if not all([siape_professor, nome_professor, email_professor, senha_professor]):
+        flash('Todos os campos devem estar preenchidos.', 'danger')
+        return
+
+    cursor.execute("SELECT * FROM usuario WHERE identificacao = %s", (siape_professor,))
+    if cursor.fetchone():
+        flash('Professor já existe.', 'danger')
+        return
+
+    cursor.execute(
+        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
+        (siape_professor, 'professor', nome_professor, email_professor, hash_senha(senha_professor))
+    )
+    conn.commit()
+    flash('Professor adicionado com sucesso!', 'success')
+
+
+def handle_alterar_professor(cursor, conn, form):
+    id_usuario = form.get('id_usuario', '')
+    siape_professor = form.get('siape_professor', '').strip()
+    nome_professor = form.get('nome_professor', '').strip()
+    email_professor = form.get('email_professor', '').strip()
+    senha_professor = form.get('senha_professor', '').strip()
+
+    if not id_usuario:
+        flash('Selecione um professor para alterar.', 'danger')
+        return
+    if siape_professor == "" or nome_professor == "" or email_professor == "":
+        flash('SIAPE, nome e email não podem ser vazios.', 'danger')
+        return
+
+    # Mesma regra do aluno: senha só é trocada se o campo vier preenchido.
+    if senha_professor:
+        cursor.execute(
+            "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
+            (siape_professor, nome_professor, email_professor, hash_senha(senha_professor), id_usuario)
+        )
+    else:
+        cursor.execute(
+            "UPDATE usuario SET identificacao=%s, nome=%s, email=%s WHERE id_usuario=%s",
+            (siape_professor, nome_professor, email_professor, id_usuario)
+        )
+    conn.commit()
+    flash('Professor alterado com sucesso!', 'success')
+
+
+def handle_deletar_professor(cursor, conn, form):
+    siape_professor = form.get('siape_professor', '').strip()
+
+    if siape_professor == "":
+        flash('SIAPE do professor não pode ser vazio.', 'danger')
+        return
+
+    cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (siape_professor,))
+    conn.commit()
+    flash('Professor deletado com sucesso!', 'success')
+
+
+# Mapa "nome do botão" → handler. Novas ações só precisam de uma
+# função nova e uma linha aqui — a rota /adm não muda.
+ACOES_ADM = {
+    'adicionar_curso': handle_adicionar_curso,
+    'alterar_curso': handle_alterar_curso,
+    'deletar_curso': handle_deletar_curso,
+
+    'adicionar_periodo': handle_adicionar_periodo,
+    'alterar_periodo': handle_alterar_periodo,
+    'deletar_periodo': handle_deletar_periodo,
+
+    'adicionar_aluno': handle_adicionar_aluno,
+    'alterar_aluno': handle_alterar_aluno,
+    'deletar_aluno': handle_deletar_aluno,
+
+    'adicionar_professor': handle_adicionar_professor,
+    'alterar_professor': handle_alterar_professor,
+    'deletar_professor': handle_deletar_professor,
+}
+
+
 # Rotas
 
 @app.route('/')
 def inicio():
     return render_template('InicioSite.html')
-    
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -52,11 +373,11 @@ def login():
         identificacao = request.form.get('identificacao', '').strip()
         senha = request.form.get('senha', '').strip()
 
-        tipo = detectar_tipo (identificacao)
+        tipo = detectar_tipo(identificacao)
         if not tipo:
             flash('Matricula ou SIAPE invalido.', 'erro')
             return render_template('Login.html')
-        
+
         conn = get_db()
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
@@ -80,222 +401,50 @@ def login():
                 return redirect(url_for('adm'))
             else:
                 flash('Tipo de usuário desconhecido.', 'erro')
-        else: 
+        else:
             flash('Usuário ou senha incorretos.', 'erro')
     return render_template('Login.html')
+
 
 @app.route('/adm', methods=['GET', 'POST'])
 def adm():
     if 'usuario_id' not in session or session.get('tipo') != 'adm':
         flash('Acesso restrito.', 'erro')
         return redirect(url_for('login'))
-    
+
     conn = get_db()
     cursor = conn.cursor(dictionary=True)
-    
-    
+
     if request.method == 'POST':
-        botao = request.form.get("btn")
+        botao = request.form.get('btn')
+        handler = ACOES_ADM.get(botao)
 
-    try:
-        
-        if botao == "adicionar_curso":
-            nome_curso = request.form.get('nome_curso', '').strip()
-            sigla_curso = request.form.get('sigla_curso', '').strip()
-            if sigla_curso == "" or nome_curso == "":
-                flash(f'Nome e sigla do curso não podem ser vazios.', 'danger')
-            else:
-                cursor.execute("SELECT * FROM curso WHERE nome = %s", (nome_curso,))
-                if cursor.fetchone():
-                    flash(f'Curso já existe.', 'danger')
-                else:
-                    cursor.execute(
-                        "INSERT INTO curso (nome, sigla) VALUES (%s, %s)",
-                        (nome_curso, sigla_curso)
-                    )
-                    conn.commit()
-                    flash('Curso adicionado com sucesso!', 'success')
+        if handler is None:
+            flash('Ação desconhecida.', 'danger')
+        else:
+            try:
+                handler(cursor, conn, request.form)
+            except Exception as e:
+                conn.rollback()
+                flash(f'Erro: {e}. Tente novamente.', 'danger')
 
-        elif botao == "alterar_curso":
-            curso_id  = request.form.get('curso_id')
-            novo_nome = request.form.get('novo_nome', '').strip()
-            nova_sigla = request.form.get('nova_sigla', '').strip()
-
-            cursor.execute(
-                "UPDATE curso SET nome=%s, sigla=%s WHERE id_curso=%s",
-                (novo_nome, nova_sigla, curso_id)
-            )
-            conn.commit()
-            flash('Curso alterado com sucesso!', 'success')
-
-        elif botao == "deletar_curso":
-            excluir_sigla = request.form.get('excluir_sigla', '').strip()
-
-            cursor.execute("DELETE FROM curso WHERE sigla=%s", (excluir_sigla,))
-            conn.commit()
-            flash('Curso deletado com sucesso!', 'success')
-
-        elif botao == "adicionar_periodo":
-            inicio_periodo = request.form.get('inicio_periodo', '').strip()
-            fim_periodo = request.form.get('fim_periodo', '').strip()
-            descricao = request.form.get('descricao', '').strip()
-            if inicio_periodo == "" or fim_periodo == "" or descricao == "":
-                flash(f'Datas do período não podem ser vazias.', 'danger')
-            else:
-                try:
-                    # Converte de DD/MM/AAAA (formato brasileiro) para AAAA-MM-DD (formato americano)
-                    inicio_periodo_us = datetime.strptime(inicio_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
-                    fim_periodo_us = datetime.strptime(fim_periodo, '%d/%m/%Y').strftime('%Y-%m-%d')
-                except ValueError as e:
-                    flash(f'{e} Formato de data inválido. Use DD/MM/AAAA.', 'danger')
-                else:
-                    cursor.execute("SELECT * FROM periodo WHERE data_inicio = %s AND data_fim = %s", (inicio_periodo_us, fim_periodo_us))
-                    if cursor.fetchone():
-                        flash(f'Período já existe.', 'danger')
-                    else:
-                        cursor.execute(
-                            "INSERT INTO periodo (data_inicio, data_fim, descricao) VALUES (%s, %s, %s)",
-                            (inicio_periodo_us, fim_periodo_us, descricao)
-                        )
-                        conn.commit()
-                        flash('Período adicionado com sucesso!', 'success')
-
-        elif botao == "alterar_periodo":
-            nova_data_inicio = request.form.get('nova_data_inicio', '').strip()
-            nova_data_fim = request.form.get('nova_data_fim', '').strip()
-            nova_descricao = request.form.get('nova_descricao', '').strip()
-            periodo_id = request.form.get('periodo_id')
-            if nova_data_inicio == "" or nova_data_fim == "" or nova_descricao == "":
-                flash(f'Datas do período não podem ser vazias.', 'danger')
-            else:
-                cursor.execute(
-                    "UPDATE periodo SET data_inicio=%s, data_fim=%s, descricao=%s WHERE id_periodo=%s",
-                    (nova_data_inicio, nova_data_fim, nova_descricao, periodo_id)
-                )
-                conn.commit()
-                flash('Período alterado com sucesso!', 'success')
-
-        elif botao == "deletar_periodo":
-            excluir_periodo = request.form.get('excluir_periodo', '').strip()
-            if excluir_periodo == "":
-                flash(f'Datas do período não podem ser vazias.', 'danger')
-            else:
-                cursor.execute("DELETE FROM periodo WHERE data_inicio=%s", (excluir_periodo,))
-                conn.commit()
-                flash('Período deletado com sucesso!', 'success')
-
-        elif botao == "adicionar_aluno":
-            matricula_aluno = request.form.get('matricula_aluno', '').strip()
-            nome_aluno = request.form.get('nome_aluno', '').strip()
-            email_aluno = request.form.get('email_aluno', '').strip()
-            senha_aluno = request.form.get('senha_aluno', '').strip()
-
-            if matricula_aluno == "" or nome_aluno == "" or email_aluno == "" or senha_aluno == "":
-                flash(f'Todos os campos devem ser preenchidos.', 'danger')
-            else:
-                cursor.execute("SELECT * FROM usuario WHERE identificacao = %s", (matricula_aluno,))
-                if cursor.fetchall():
-                    flash(f'Aluno já existe.', 'danger')
-                else:
-                    cursor.execute(
-                        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
-                        (matricula_aluno, 'aluno', nome_aluno, email_aluno, hash_senha(senha_aluno))
-                    )
-                    conn.commit()
-                    flash('Aluno adicionado com sucesso!', 'success')
-
-        elif botao == "alterar_aluno":
-            matricula_aluno = request.form.get('matricula_aluno', '').strip()
-            nome_aluno = request.form.get('nome_aluno', '').strip()
-            email_aluno = request.form.get('email_aluno', '').strip()
-            senha_aluno = request.form.get('senha_aluno', '').strip()
-            id_usuario = request.form.get('id_usuario', '')
-
-            if matricula_aluno == "" or nome_aluno == "" or email_aluno == "" or senha_aluno == "":
-                flash(f'Todos os campos devem ser preenchidos.', 'danger')
-            else:
-                cursor.execute(
-                    "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
-                    (matricula_aluno, nome_aluno, email_aluno, hash_senha(senha_aluno), id_usuario)
-                )
-                conn.commit()
-                flash('Aluno alterado com sucesso!', 'success')
-
-        elif botao == "deletar_aluno":
-            matricula_aluno = request.form.get('matricula_aluno', '').strip()
-            if matricula_aluno == "":
-                flash(f'Matrícula do aluno não pode ser vazia.', 'danger')
-            else:
-                cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (matricula_aluno,))
-                conn.commit()
-                flash('Aluno deletado com sucesso!', 'success')
-
-        elif botao == "adicionar_professor":
-            siape_professor = request.form.get('siape_professor','').strip()
-            nome_professor = request.form.get('nome_professor','').strip()
-            email_professor = request.form.get('email_professor', '').strip()
-            senha_professor = request.form.get('senha_professor', '').strip()
-            id_usuario = request.form.get('id_usuario', '')
-
-            if siape_professor == "" or nome_professor == "" or email_professor == "" or senha_professor == "":
-                flash(f"Todos os campos devem estar preenchidos.", 'danger')
-            else:
-                cursor.execute(
-                    "SELECT * FROM usuario WHERE identificacao = %s", (siape_professor,)
-                )
-                if cursor.fetchone():
-                    flash(f'Professor já existe.', 'danger')
-                else:
-                    cursor.execute(
-                        "INSERT INTO usuario (identificacao, tipo, nome, email, senha_hash) VALUES (%s,%s,%s,%s,%s)",
-                        (siape_professor, 'professor', nome_professor, email_professor, hash_senha(senha_professor))
-                    )
-                    conn.commit()
-                    flash('Professor adicionado com sucesso!', 'success')
-                    
-        elif botao == "alterar_professor":
-            siape_professor = request.form.get('siape_professor','').strip()
-            nome_professor = request.form.get('nome_professor','').strip()
-            email_professor = request.form.get('email_professor', '').strip()
-            senha_professor = request.form.get('senha_professor', '').strip()
-            id_usuario = request.form.get('id_usuario', '')
-
-            if siape_professor == "" or nome_professor == "" or email_professor == "" or senha_professor == "":
-                flash(f"Todos os campos devem estar preenchidos.", 'danger')
-            else:
-                cursor.execute(
-                    "UPDATE usuario SET identificacao=%s, nome=%s, email=%s, senha_hash=%s WHERE id_usuario=%s",
-                    (siape_professor, nome_professor, email_professor, hash_senha(senha_professor), id_usuario)
-                )
-                conn.commit()
-                flash('Professor alterado com sucesso!', 'success')
-
-        elif botao == "deletar_professor":
-            siape_professor = request.form.get('siape_professor','').strip()
-            if siape_professor == "":
-                flash(f'SIAPE do professor não pode ser vazio.', 'danger')
-            else:
-                cursor.execute("DELETE FROM usuario WHERE identificacao=%s", (siape_professor,))
-                conn.commit()
-                flash('Professor deletado com sucesso!', 'success')
-
-    except Exception as e:
-        conn.rollback()
-        flash(f'Erro: {e}. Tente novamente.', 'danger')
-        
     cursor.execute("SELECT id_curso, nome, sigla FROM curso")
     lista_cursos = cursor.fetchall()
-    cursor.execute("SELECT id_periodo, data_inicio, data_fim FROM periodo ")
+    cursor.execute("SELECT id_periodo, descricao, data_inicio, data_fim FROM periodo")
     lista_periodo = cursor.fetchall()
-    cursor.execute("SELECT id_usuario, identificacao FROM usuario WHERE tipo='aluno'")
+    cursor.execute("SELECT id_usuario, identificacao, nome, email FROM usuario WHERE tipo='aluno'")
     lista_alunos = cursor.fetchall()
-    cursor.execute("SELECT id_usuario, identificacao FROM usuario WHERE tipo='professor'")
+    cursor.execute("SELECT id_usuario, identificacao, nome, email FROM usuario WHERE tipo='professor'")
     lista_professores = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
 
     return render_template('ADM.html', cursos=lista_cursos,
                             periodos=lista_periodo,
                             alunos=lista_alunos,
                             professores=lista_professores)
+
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def cadastro():
@@ -357,7 +506,7 @@ def cadastro():
             else:
                 return redirect(url_for('professores'))
 
-        except Exception as e:
+        except Exception:
             conn.rollback()
             flash('Erro ao salvar cadastro. Tente novamente.', 'erro')
         finally:
@@ -366,14 +515,15 @@ def cadastro():
 
     return render_template('Cadastro.html')
 
+
 @app.route('/alunos')
 def alunos():
     if 'usuario_id' not in session or session.get('tipo') != 'aluno':
         return redirect(url_for('login'))
- 
-    conn   = get_db()
+
+    conn = get_db()
     cursor = conn.cursor(dictionary=True)
- 
+
     # Disciplinas matriculadas pelo aluno (com curso e professor)
     cursor.execute('''
         SELECT d.nome,
@@ -393,7 +543,7 @@ def alunos():
         ORDER BY p.data_inicio DESC, d.nome
     ''', (session['usuario_id'],))
     disciplinas = cursor.fetchall()
- 
+
     # Professores das disciplinas do aluno (sem repetição)
     cursor.execute('''
         SELECT DISTINCT u.id_usuario,
@@ -409,7 +559,7 @@ def alunos():
     professores = cursor.fetchall()
 
     cursor.execute('''
-        SELECT 
+        SELECT
             u.id_usuario, u.nome, u.identificacao,
             MAX(m.criado_em) AS ultima_mensagem,
             (SELECT CONCAT(
@@ -440,25 +590,25 @@ def alunos():
 
     for c in conversas:
         c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
- 
+
     cursor.close()
     conn.close()
- 
+
     return render_template('Alunos.html',
                         disciplinas=disciplinas,
                         professores=professores,
                         conversas=conversas
                         )
- 
- 
+
+
 @app.route('/professores')
 def professores():
     if 'usuario_id' not in session or session.get('tipo') != 'professor':
         return redirect(url_for('login'))
- 
-    conn   = get_db()
+
+    conn = get_db()
     cursor = conn.cursor(dictionary=True)
- 
+
     # Disciplinas lecionadas pelo professor (com curso)
     cursor.execute('''
         SELECT d.id_disciplina,
@@ -474,7 +624,6 @@ def professores():
     ''', (session['usuario_id'],))
     disciplinas = cursor.fetchall()
 
-
     cursor.execute('''
         SELECT DISTINCT al.id_usuario, al.nome, al.identificacao
         FROM disciplina_periodo dp
@@ -487,7 +636,7 @@ def professores():
 
     # Conversas — últimas mensagens por aluno
     cursor.execute('''
-        SELECT 
+        SELECT
             u.id_usuario, u.nome, u.identificacao,
             MAX(m.criado_em) AS ultima_mensagem,
             (SELECT CONCAT(
@@ -517,30 +666,35 @@ def professores():
     conversas = cursor.fetchall()
     for c in conversas:
         c['ultima_mensagem'] = c['ultima_mensagem'].strftime('%d/%m/%Y %H:%M')
- 
+
     cursor.close()
     conn.close()
- 
+
     return render_template('Professores.html',
                             disciplinas=disciplinas,
                             alunos=alunos,
                             conversas=conversas
                           )
 
+
 @app.route('/termos')
 def termos():
     return render_template('Termos.html')
+
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('inicio'))
+
+
 # API auxiliar
 @app.route('/api/validar-id', methods=['POST'])
 def validar_id():
     identificacao = request.json.get('identificacao', '')
     tipo = detectar_tipo(identificacao)
     return jsonify({'validar': tipo is not None, 'tipo': tipo})
+
 
 @app.route('/mensagens/<int:id_destinatario>')
 def get_mensagens(id_destinatario):
@@ -569,6 +723,7 @@ def get_mensagens(id_destinatario):
         m['criado_em'] = m['criado_em'].strftime('%H:%M')
     return {'mensagens': msgs}
 
+
 # Evento SocketIO — entrar na sala do chat
 @socketio.on('entrar_sala')
 def entrar_sala(data):
@@ -578,6 +733,7 @@ def entrar_sala(data):
         str(data['id_destinatario'])
     ]))
     join_room(sala)
+
 
 # Evento SocketIO — enviar mensagem
 @socketio.on('enviar_mensagem')

@@ -13,6 +13,7 @@
             <button class="btn-nav" data-secao="db_periodo">Período</button>
             <button class="btn-nav" data-secao="db_aluno">Aluno</button>
             <button class="btn-nav" data-secao="db_professor">Professor</button>
+            <button class="btn-nav" data-secao="db_disciplina">Disciplina</button>
     </nav>
     <main>
         <section class="secao ativo" id="secao-db_home">
@@ -32,7 +33,7 @@
         <section class="secao" id="secao-db_curso">
             <h1>Gerenciamento de Cursos</h1>
             <!-- ADICIONAR CURSO -->
-            <div class="adicionar-curso">
+            <div class="curso">
                 <form method="POST">
                     <h2>Adicionar Novo Curso</h2>
                     <label for="Insert-curso">Digite o nome do novo curso:</label>
@@ -43,38 +44,41 @@
                 </form>    
             </div>
             <!-- ALTERAR CURSO -->
-            <div class="alterar-curso">
+            <div class="curso">
                 <h2>Alterar Curso</h2>
                 <button id="btn-alterar-curso">Cursos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-curso" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-curso">
                     {% for curso in cursos %}
                         <li>
-                            <a href="#" class="item-curso" data-id="{{ curso.id_curso }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
+                            <a href="#" class="item-curso" 
+                                data-id="{{ curso.id_curso }}" 
+                                data-nome="{{ curso.nome }}" 
+                                data-sigla="{{ curso.sigla }}">
                                 {{ curso.nome }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST">
-                    <div>
-                        <input type="hidden" id="input-id-curso" name="curso_id">
-                        <label for="input-editar-curso-nome">digite o novo curso:</label>
-                        <input type="text" id="input-editar-curso-nome" name="novo_nome">
-                        <label for="input-editar-curso-sigla">digite a nova sigla:</label>
-                        <input type="text" id="input-editar-curso-sigla" name="nova_sigla">
-                        <button name="btn" value="alterar_curso" id="btn-confirmar-alteracao-curso">Confirmar Alteração</button>
-                    </div>
+                    <input type="hidden" id="input-id-curso" name="curso_id" data-fonte="data-id">
+                    <label for="input-editar-curso-nome">Digite o novo curso:</label>
+                    <input type="text" id="input-editar-curso-nome" name="novo_nome" data-fonte="data-nome">
+                    <label for="input-editar-curso-sigla">Digite a nova sigla:</label>
+                    <input type="text" id="input-editar-curso-sigla" name="nova_sigla" data-fonte="data-sigla">
+                    <button name="btn" value="alterar_curso" id="btn-confirmar-alteracao-curso">Confirmar Alteração</button>
                 </form>
             </div>
             <!-- EXCLUIR CURSO -->
-            <div class="excluir-curso">
+            <div class="curso">
                 <h2>Excluir Curso</h2>
                 <button type="button" id="btn-excluir-curso">Cursos existentes ▼</button>
 
-                <ul class="dropdown" id="lista-dropdown-excluir-curso" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-excluir-curso">
                     {% for curso in cursos %}
                         <li>
-                            <a href="#" class="item-excluir-curso" data-id="{{ curso.id_curso }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
+                            <a href="#" class="item-excluir-curso" 
+                                data-id="{{ curso.id_curso }}"  
+                                data-sigla="{{ curso.sigla }}">
                                 {{ curso.sigla }}
                             </a>
                         </li>
@@ -82,12 +86,10 @@
                 </ul>
 
                 <form method="POST">
-                    <div>
-                        <input type="hidden" id="input-id-excluir-curso" name="curso_id">
-                        <label>Curso selecionado:</label>
-                        <input type="text" id="input-excluir-curso" name="excluir_sigla">
-                        <button name="btn" value="deletar_curso" id="btn-confirmar-exclusao-curso">Confirmar Exclusão</button>
-                    </div>
+                    <input type="hidden" id="input-id-excluir-curso" name="curso_id" data-fonte="data-id">
+                    <label>Curso selecionado:</label>
+                    <input type="text" id="input-excluir-curso" name="excluir_sigla" data-fonte="data-sigla">
+                    <button name="btn" value="deletar_curso" id="btn-confirmar-exclusao-curso">Confirmar Exclusão</button>
                 </form>
             </div>
              {% with messages = get_flashed_messages(with_categories=true) %}
@@ -104,7 +106,7 @@
         <section class="secao" id="secao-db_periodo">
             <h1>Gerenciador de Periodo</h1>
             <!-- ADICIONAR PERIODO -->
-            <div class="adicionar-periodo">
+            <div class="periodo">
                 <form method="POST">
                     <h2>Adicionar Novo Periodo</h2>
                     <label for="insert-inicio">Digite a data do começo do periodo:</label>
@@ -117,53 +119,55 @@
                 </form>    
             </div>
             <!-- ALTERAR PERIODO -->
-            <div class="alterar-periodo">
+            <div class="periodo">
                 <h2>Alterar Periodo</h2>
                 <button id="btn-alterar-periodo">Periodo existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-periodo" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-periodo">
                     {% for periodo in periodos %}
                         <li>
-                            <a href="#" class="item-periodo" data-id="{{ periodo.id_periodo }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
-                                {{ periodo.data_inicio }} 
+                            <a href="#" class="item-periodo" 
+                                data-id="{{ periodo.id_periodo }}" 
+                                data-inicio="{{ periodo.data_inicio.strftime('%d/%m/%Y') }}" 
+                                data-fim="{{ periodo.data_fim.strftime('%d/%m/%Y') }}" 
+                                data-descricao="{{ periodo.descricao }}">
+                                {{ periodo.descricao }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST">
-                    <div>
-                        <input type="hidden" id="input-id-periodo" name="periodo_id">
-                        <label for="input-editar-periodo-inicio">digite a nova data de início:</label>
-                        <input type="text" id="input-editar-periodo-inicio" name="nova_data_inicio">
-                        <label for="input-editar-periodo-fim">digite a nova data de fim:</label>
-                        <input type="text" id="input-editar-periodo-fim" name="nova_data_fim">
-                        <label for="input-editar-periodo-descricao">digite a nova descrição:</label>
-                        <input type="text" id="input-editar-periodo-descricao" name="nova_descricao">
-                        <button name="btn" value="alterar_periodo" id="btn-confirmar-alteracao-periodo">Confirmar Alteração</button>
-                    </div>
+                    <input type="hidden" id="input-id-periodo" name="periodo_id" data-fonte="data-id">
+                    <label for="input-editar-periodo-inicio">Digite a nova data de início:</label>
+                    <input type="text" id="input-editar-periodo-inicio" name="nova_data_inicio" data-fonte="data-inicio">
+                    <label for="input-editar-periodo-fim">Digite a nova data de fim:</label>
+                    <input type="text" id="input-editar-periodo-fim" name="nova_data_fim" data-fonte="data-fim">
+                    <label for="input-editar-periodo-descricao">Digite a nova descrição:</label>
+                    <input type="text" id="input-editar-periodo-descricao" name="nova_descricao" data-fonte="data-descricao">
+                    <button name="btn" value="alterar_periodo" id="btn-confirmar-alteracao-periodo">Confirmar Alteração</button>
                 </form>
             </div>
             <!-- EXCLUIR PERIODO -->
-            <div class="excluir-periodo">
+            <div class="periodo">
                 <h2>Excluir Periodo</h2>
                 <button type="button" id="btn-excluir-periodo">Períodos existentes ▼</button>
 
-                <ul class="dropdown" id="lista-dropdown-excluir-periodo" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-excluir-periodo">
                     {% for periodo in periodos %}
                         <li>
-                            <a href="#" class="item-excluir-periodo" data-id="{{ periodo.id_periodo }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
-                                {{ periodo.data_inicio }}
+                            <a href="#" class="item-excluir-periodo"
+                                data-id="{{ periodo.id_periodo }}"
+                                data-descricao="{{ periodo.descricao }}">
+                                {{ periodo.descricao }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
 
                 <form method="POST">
-                    <div>
-                        <input type="hidden" id="input-id-excluir-periodo" name="periodo_id">
-                        <label>Período selecionado:</label>
-                        <input type="text" id="input-excluir-periodo" name="excluir_periodo">
-                        <button name="btn" value="deletar_periodo" id="btn-confirmar-exclusao-periodo">Confirmar Exclusão</button>
-                    </div>
+                    <input type="hidden" id="input-id-excluir-periodo" name="periodo_id" data-fonte="data-id">
+                    <label>Período selecionado:</label>
+                    <input type="text" id="input-excluir-periodo" name="excluir_periodo" data-fonte="data-descricao">
+                    <button name="btn" value="deletar_periodo" id="btn-confirmar-exclusao-periodo">Confirmar Exclusão</button>
                 </form>
             </div>
              {% with messages = get_flashed_messages(with_categories=true) %}
@@ -179,7 +183,7 @@
         <section class="secao" id="secao-db_aluno">
             <h1>Gerenciamento de Alunos</h1>
             <!-- ADCIONAR ALUNO -->
-            <div class="adcionar_aluno">
+            <div class="aluno">
                 <form method="POST"> 
                     <h2>Adicionar Novo Aluno</h2>
                     <label for="Insert-matricula">Digite a matrícula do aluno:</label>
@@ -194,46 +198,54 @@
                 </form>
             </div>
             <!-- ALTERAR ALUNO -->
-            <div class="alterar_aluno"> 
+            <div class="aluno"> 
+                <h2>Alterar Aluno</h2>
                 <button id="btn-alterar-aluno">Alunos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-aluno" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-aluno">
                     {% for aluno in alunos %}
                         <li>
-                            <a href="#" class="item-aluno" data-id="{{ aluno.id_usuario }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
+                            <a href="#" class="item-aluno"
+                                data-id="{{ aluno.id_usuario }}"
+                                data-matricula="{{ aluno.identificacao }}"
+                                data-nome="{{ aluno.nome }}"
+                                data-email="{{ aluno.email }}">
                                 {{ aluno.identificacao }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST"> 
-                    <h2>Alterar Aluno</h2>
+                    <input type="hidden" id="input-id-aluno" name="id_usuario" data-fonte="data-id">
                     <label for="Insert-matricula-alterar">Digite a nova matrícula do aluno/a:</label>
-                    <input type="text" id="Insert-matricula-alterar" name="matricula_aluno">
+                    <input type="text" id="Insert-matricula-alterar" name="matricula_aluno" data-fonte="data-matricula">
                     <label for="Insert-nome-alterar">Digite o novo nome do aluno/a:</label>
-                    <input type="text" id="Insert-nome-alterar" name="nome_aluno">
+                    <input type="text" id="Insert-nome-alterar" name="nome_aluno" data-fonte="data-nome">
                     <label for="Insert-email-alterar">Digite o novo email do aluno/a:</label>
-                    <input type="text" id="Insert-email-alterar" name="email_aluno">
+                    <input type="text" id="Insert-email-alterar" name="email_aluno" data-fonte="data-email">
                     <label for="Insert-senha-alterar">Digite a nova senha do aluno/a:</label>
                     <input type="text" id="Insert-senha-alterar" name="senha_aluno">
                     <button type="submit" name="btn" value="alterar_aluno" id="btn-alterar-aluno">Alterar Aluno</button>
                 </form>
             </div>
             <!-- EXCLUIR ALUNO -->
-            <div class="excluir_aluno">
+            <div class="aluno">
+                <h2>Excluir Aluno</h2>
                 <button id="btn-excluir-aluno">Alunos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-excluir-aluno" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-excluir-aluno">
                     {% for aluno in alunos %}
                         <li>
-                            <a href="#" class="item-excluir-aluno" data-id="{{ aluno.id_usuario }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
+                            <a href="#" class="item-excluir-aluno"
+                                data-id="{{ aluno.id_usuario }}"
+                                data-matricula="{{ aluno.identificacao }}">
                                 {{ aluno.identificacao }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST"> 
-                    <h2>Excluir Aluno</h2>
+                    
                     <label for="Insert-matricula-excluir">Digite a matrícula do aluno/a:</label>
-                    <input type="text" id="Insert-matricula-excluir" name="matricula_aluno">
+                    <input type="text" id="Insert-matricula-excluir" name="matricula_aluno" data-fonte="data-matricula">
                     <button type="submit" name="btn" value="deletar_aluno" id="btn-excluir-aluno">Excluir Aluno</button>
                 </form>
 
@@ -241,7 +253,7 @@
         <section class="secao" id="secao-db_professor">
             <h1>Gerenciamento de Professores</h1>
             <!-- ADICIONAR PROFESSOR -->
-            <div class="adcionar_professor"> 
+            <div class="professor"> 
                 <h2>Adicionar Novos Professores</h2>
                 <form method="POST"> 
                     <label for="insert-id-professor"> Digite o SIAPE do/a professor/a:</label>
@@ -255,48 +267,71 @@
                     <button type="submit" name="btn" value="adicionar_professor">Adicionar Professor</button>
                 </form>
             </div>
-            <div class="alterar_professor">
+            <div class="professor">
                 <h2>Alterar Professores</h2>
                 <button id="btn-alterar-professor">Professores existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-professor" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-professor" >
                     {% for professor in professores %}
                         <li>
-                            <a href="#" class="item-professor" data-id="{{ professor.id_usuario }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
-                                {{ professor.identificacao }}
+                            <a href="#" class="item-professor"
+                                data-id="{{ professor.id_usuario }}"
+                                data-siape="{{ professor.identificacao }}"
+                                data-nome="{{ professor.nome }}"
+                                data-email="{{ professor.email }}">
+                                {{ professor.nome }} 
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST">
+                    <input type="hidden" id="input-id-professor" name="id_usuario" data-fonte="data-id">
                     <label for="insert-id-professor-alterar">Digite o SIAPE do/a professor/a:</label>
-                    <input type="text" id="insert-id-professor-alterar" name="siape_professor">
+                    <input type="text" id="insert-id-professor-alterar" name="siape_professor" data-fonte="data-siape">
                     <label for="insert-nome-professor-alterar">Digite o novo nome do/a professor/a:</label>
-                    <input type="text" id="insert-nome-professor-alterar" name="nome_professor">
+                    <input type="text" id="insert-nome-professor-alterar" name="nome_professor" data-fonte="data-nome">
                     <label for="insert-email-professor-alterar">Digite o novo email do/a professor/a:</label>
-                    <input type="text" id="insert-email-professor-alterar" name="email_professor">
+                    <input type="text" id="insert-email-professor-alterar" name="email_professor" data-fonte="data-email">
                     <label for="insert-senha-professor-alterar">Digite a nova senha do/a professor/a:</label>
                     <input type="text" id="insert-senha-professor-alterar" name="senha_professor">
                     <button type="submit" name="btn" value="alterar_professor" id="btn-alterar-professor">Alterar Professor/a</button>
                 </form>
             </div>
-            <div class="excluir_professor">
+            <div class="professor">
                 <h2>Excluir Professores</h2>
                 <button id="btn-excluir-professor">Professores existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-excluir-professor" style="display: none; list-style: none; padding: 10px; border: 1px solid #ccc; max-width: 200px;">
+                <ul class="dropdown" id="lista-dropdown-excluir-professor" >
                     {% for professor in professores %}
                         <li>
-                            <a href="#" class="item-excluir-professor" data-id="{{ professor.id_usuario }}" style="text-decoration: none; color: #333; display: block; padding: 5px 0;">
-                                {{ professor.identificacao }}
+                            <a href="#" class="item-excluir-professor"
+                            data-id="{{ professor.id_usuario }}"
+                            data-siape="{{ professor.identificacao }}">
+                                {{ professor.nome }}
                             </a>
                         </li>
                     {% endfor %}
                 </ul>
                 <form method="POST"> 
                     <label for="insert-id-professor-excluir">Digite o SIAPE do/a professor/a:</label>
-                    <input type="text" id="insert-id-professor-excluir" name="siape_professor">
+                    <input type="text" id="insert-id-professor-excluir" name="siape_professor" data-fonte="data-siape">
                     <button type="submit" name="btn" value="deletar_professor" id="btn-excluir-professor">Excluir Professor/a</button>
                 </form>
-
+        </section>
+        <section class="secao" id="secao-db_disciplina">
+            <h1>Gerenciamento de Disciplinas</h1>
+            <!-- ADICIONAR DISCIPLINAS-->
+            <div class="disciplina">
+                <h2>Adicionar Novas Disciplinas</h2>
+                <form method="POST">
+                    <label for="insert-nome-disciplina">Digite o nome da disciplina:</label>
+                    <input type="text" id="insert-nome-disciplina" name="nome_disciplina">
+                    <label for="insert-cod-disciplina">Digite o código da disciplina:</label>
+                    <input type="text" id="insert-cod-disciplina" name="cod_disciplina">
+                    <label for="insert-periodo-disciplina">Digite o período da disciplina:</label>
+                    <input type="text" id="insert-periodo-disciplina" name="periodo_disciplina">
+                    <label for="insert-id-curso-disciplina">Digite o ID do curso:</label>
+                    <input type="text" id="insert-id-curso-disciplina" name="id_curso_disciplina">
+                </form>
+            </div>
         </section>
     </main>
     <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
