@@ -237,8 +237,8 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.querySelectorAll('.dropdown').forEach(function (lista) {
-    const btn  = lista.previousElementSibling;   // botão sempre vem antes do <ul>
-    const form = lista.nextElementSibling;        // formulário sempre vem depois
+    const btn  = lista.previousElementSibling;                 // botão sempre vem antes do <ul>
+    const form = lista.parentElement.querySelector('form');    // form da mesma .disciplina
 
     if (!btn || !form) return;
 
@@ -255,21 +255,23 @@ document.querySelectorAll('.dropdown').forEach(function (lista) {
         }
     });
 
-    // Preenche automaticamente todo campo do form que tiver data-fonte
+    // Preenche só os campos cujo data-fonte existe no item clicado
     lista.addEventListener('click', function (evento) {
-        const item = evento.target.closest('a[data-id]');
+        const item = evento.target.closest('a');
         if (!item || !lista.contains(item)) return;
 
         evento.preventDefault();
 
         form.querySelectorAll('[data-fonte]').forEach(function (campo) {
-            campo.value = item.getAttribute(campo.dataset.fonte) || '';
+            const atributo = campo.dataset.fonte;
+            if (item.hasAttribute(atributo)) {
+                campo.value = item.getAttribute(atributo);
+            }
         });
 
         lista.style.display = 'none';
     });
 });
-
 // Fecha qualquer dropdown aberto ao clicar fora dele
 window.addEventListener('click', function (evento) {
     document.querySelectorAll('.dropdown').forEach(function (lista) {

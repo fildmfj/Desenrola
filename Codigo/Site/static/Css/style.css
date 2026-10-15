@@ -23,7 +23,7 @@ body {
     flex-direction: column;
 }
 
-a { text-decoration: none; }
+a { text-decoration: none; } 
 
 /* ─── Logo ───────────────────────────────────────────────────── */
 .LogoSite {
@@ -626,7 +626,7 @@ main {
     margin-bottom: -8px;
 }
 
-.secao input[type="text"] {
+.secao input[type="text"], input[type="password"], input[type="email"] {
     padding: 11px 16px;
     border: 2px solid transparent;
     border-radius: var(--radius);

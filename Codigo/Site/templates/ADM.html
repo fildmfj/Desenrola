@@ -14,11 +14,12 @@
             <button class="btn-nav" data-secao="db_aluno">Aluno</button>
             <button class="btn-nav" data-secao="db_professor">Professor</button>
             <button class="btn-nav" data-secao="db_disciplina">Disciplina</button>
+            <button class="btn-nav" data-secao="db_matricula-disciplina">Matricula Disciplina</button>
     </nav>
     <main>
         <section class="secao ativo" id="secao-db_home">
             <h1>Bem-vindo ao Gerenciador do Sistema</h1>
-            <p>Use o menu acima para gerenciar cursos, períodos, alunos e professores.</p>
+            <p>Use o menu acima para direcionar-se ao gerenciamento do sistema.</p>
             {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
@@ -192,8 +193,8 @@
                     <input type="text" id="Insert-nome" name="nome_aluno">
                     <label for="Insert-email">Digite o email do aluno:</label>
                     <input type="text" id="Insert-email" name="email_aluno">
-                    <label for="Insert-senha">Digite a senha do aluno:</label>
-                    <input type="text" id="Insert-senha" name="senha_aluno">
+                    <label type="password" for="Insert-senha">Digite a senha do aluno:</label>
+                    <input type="password" id="Insert-senha" name="senha_aluno">
                     <button type="submit" name="btn" value="adicionar_aluno">Adicionar Aluno</button>
                 </form>
             </div>
@@ -209,7 +210,7 @@
                                 data-matricula="{{ aluno.identificacao }}"
                                 data-nome="{{ aluno.nome }}"
                                 data-email="{{ aluno.email }}">
-                                {{ aluno.identificacao }}
+                                {{ aluno.identificacao }} - {{ aluno.nome }}
                             </a>
                         </li>
                     {% endfor %}
@@ -222,8 +223,8 @@
                     <input type="text" id="Insert-nome-alterar" name="nome_aluno" data-fonte="data-nome">
                     <label for="Insert-email-alterar">Digite o novo email do aluno/a:</label>
                     <input type="text" id="Insert-email-alterar" name="email_aluno" data-fonte="data-email">
-                    <label for="Insert-senha-alterar">Digite a nova senha do aluno/a:</label>
-                    <input type="text" id="Insert-senha-alterar" name="senha_aluno">
+                    <label type="password" for="Insert-senha-alterar">Digite a nova senha do aluno/a:</label>
+                    <input type="password" id="Insert-senha-alterar" name="senha_aluno">
                     <button type="submit" name="btn" value="alterar_aluno" id="btn-alterar-aluno">Alterar Aluno</button>
                 </form>
             </div>
@@ -330,8 +331,84 @@
                     <input type="text" id="insert-periodo-disciplina" name="periodo_disciplina">
                     <label for="insert-id-curso-disciplina">Digite o ID do curso:</label>
                     <input type="text" id="insert-id-curso-disciplina" name="id_curso_disciplina">
+                    <button type="submit" name="btn" value="adicionar_disciplina" id="btn-adicionar-disciplina">Adicionar Disciplina</button>
                 </form>
             </div>
+            <div class="disciplina">
+                <h2>Alterar Disciplinas</h2>
+                <button id="btn-alterar-disciplina">Disciplinas existentes ▼</button>
+                <ul class="dropdown" id="lista-dropdown-disciplina">
+                    {% for disciplina in disciplinas %}
+                        <li>
+                            <a href="#" class="item-disciplina"
+                                data-id-disciplina="{{ disciplina.id_disciplina }}"
+                                data-nome="{{ disciplina.nome }}"
+                                data-codigo="{{ disciplina.codigo }}"
+                                data-periodo="{{ disciplina.periodo }}"
+                                data-id-curso="{{ disciplina.id_curso }}">
+                                {{ disciplina.nome }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <button type="button" id="btn-alterar-disciplina-curso" value="dropdown_al_curso">Cursos existentes ▼</button>
+                    <ul class="dropdown" id="lista-dropdown-disciplinsa-curso">
+                        {% for curso in cursos %}
+                            <li>
+                                <a href="#" class="item-curso-alterar"
+                                    data-id-curso="{{ curso.id_curso }}"
+                                    data-nome-curso="{{ curso.nome }}">
+                                    {{ curso.id_curso }} - {{ curso.nome }}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                <form method="POST">
+                    <input type="hidden" id="input-id-disciplina" name="id_disciplina" data-fonte="data-id-disciplina">
+                    <label for="insert-nome-disciplina-alterar">Digite o nome da disciplina:</label>
+                    <input type="text" id="insert-nome-disciplina-alterar" name="nome_disciplina" data-fonte="data-nome">
+                    <label for="insert-cod-disciplina-alterar">Digite o código da disciplina:</label>
+                    <input type="text" id="insert-cod-disciplina-alterar" name="cod_disciplina" data-fonte="data-codigo">
+                    <label for="insert-periodo-disciplina-alterar">Digite o período da disciplina:</label>
+                    <input type="text" id="insert-periodo-disciplina-alterar" name="periodo_disciplina" data-fonte="data-periodo">
+                    <label for="insert-id-curso-disciplina-alterar">Digite o ID do curso:</label>
+                    <input type="text" id="insert-id-curso-disciplina-alterar" name="id_curso_disciplina" data-fonte="data-id-curso">
+                    <button type="submit" name="btn" value="alterar_disciplina" id="btn-alterar-disciplina">Alterar Disciplina</button>
+                </form>
+            </div>
+            <div class="disciplina">
+                <h2>Excluir Disciplinas</h2>
+                <button id="btn-excluir-disciplina">Disciplinas existentes ▼</button>
+                <ul class="dropdown" id="lista-dropdown-excluir-disciplina">
+                    {% for disciplina in disciplinas %}
+                        <li>
+                            <a href="#" class="item-excluir-disciplina"
+                                data-id="{{ disciplina.id_disciplina }}"
+                                data-nome="{{ disciplina.nome }}">
+                                {{ disciplina.nome }}
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <form method="POST">
+                    <label for="insert-nome-disciplina-excluir">Disciplina selecionada para exclusão:</label>
+                    <input type="hidden" id="insert-nome-disciplina-excluir" name="id_disciplina" data-fonte="data-id">
+                    <input type="text" id="insert-nome-disciplina-excluir" name="nome_disciplina" data-fonte="data-nome" disabled>
+                    <button type="submit" name="btn" value="deletar_disciplina" id="btn-excluir-disciplina">Excluir Disciplina</button>
+                </form>
+            </div>
+        </section>
+        <section class="secao" id="secao-db_matricula-disciplina">
+            <h1> Gerenciar Matrículas em Disciplinas </h1>
+            <div class="matricula-disciplina">
+                <h2>Matricular Aluno em Disciplina</h2>
+                <form method="POST">
+                    <label for="insert-matricula-aluno">Digite a matrícula do aluno:</label>
+                    <input type="text" id="insert-matricula-aluno" name="matricula_aluno">
+                    <label for="insert-cod-disciplina">Digite o código da disciplina:</label>
+                    <input type="text" id="insert-cod-disciplina" name="cod_disciplina">
+                    <button type="submit" name="btn" value="matricular_aluno">Matricular Aluno</button>
+                </form>
         </section>
     </main>
     <script src="{{ url_for('static', filename='Js/script.js') }}"></script>

@@ -338,6 +338,51 @@ def handle_deletar_professor(cursor, conn, form):
     conn.commit()
     flash('Professor deletado com sucesso!', 'success')
 
+def handle_adcionar_disciplina(cursor, conn, form):
+    nome_disciplina=form.get('nome_disciplina','').strip()
+    cod_disciplina=form.get('cod_disciplina','').strip()
+    periodo_disciplina=form.get('periodo_disciplina','').strip()
+    id_curso_disciplina=form.get('id_curso_disciplina','').strip()
+
+    if nome_disciplina=="" or cod_disciplina=="" or periodo_disciplina=="" or id_curso_disciplina==""   :
+        flash('Todos os campos são obrigatórios.', 'danger')
+        return
+
+    cursor.execute(
+        "INSERT INTO disciplina (nome, codigo, periodo, id_curso) VALUES (%s,%s,%s,%s)",
+        (nome_disciplina, cod_disciplina, periodo_disciplina, id_curso_disciplina)
+    )
+    conn.commit()
+    flash('Disciplina adicionada com sucesso!', 'success')
+
+def handle_alterar_disciplina(cursor, conn, form):
+    id_disciplina=form.get('id_disciplina','')
+    nome_disciplina=form.get('nome_disciplina','').strip()
+    cod_disciplina=form.get('cod_disciplina','').strip()
+    periodo_disciplina=form.get('periodo_disciplina','').strip()
+    id_curso_disciplina=form.get('id_curso_disciplina','').strip()
+
+    if id_disciplina=="" or nome_disciplina=="" or cod_disciplina=="" or periodo_disciplina=="" or id_curso_disciplina=="":
+        flash('Todos os campos são obrigatórios.', 'danger')
+        return
+
+    cursor.execute(
+        "UPDATE disciplina SET nome=%s, codigo=%s, periodo=%s, id_curso=%s WHERE id_disciplina=%s",
+        (nome_disciplina, cod_disciplina, periodo_disciplina, id_curso_disciplina, id_disciplina)
+    )
+    conn.commit()
+    flash(f'Disciplina alterada com sucesso!', 'success ')
+
+def handle_deletar_disciplina(cursor, conn, form):
+    id_disciplina=form.get('id_disciplina','')
+
+    if id_disciplina=="":
+        flash(f'Selecione uma disciplina para excluir.{id_disciplina}', 'danger')
+        return
+
+    cursor.execute("DELETE FROM disciplina WHERE id_disciplina=%s", (id_disciplina,))
+    conn.commit()
+    flash('Disciplina deletada com sucesso!', 'success')
 
 # Mapa "nome do botão" → handler. Novas ações só precisam de uma
 # função nova e uma linha aqui — a rota /adm não muda.
@@ -357,6 +402,10 @@ ACOES_ADM = {
     'adicionar_professor': handle_adicionar_professor,
     'alterar_professor': handle_alterar_professor,
     'deletar_professor': handle_deletar_professor,
+
+    'adicionar_disciplina': handle_adcionar_disciplina,
+    'alterar_disciplina': handle_alterar_disciplina,
+    'deletar_disciplina': handle_deletar_disciplina,
 }
 
 
@@ -436,6 +485,8 @@ def adm():
     lista_alunos = cursor.fetchall()
     cursor.execute("SELECT id_usuario, identificacao, nome, email FROM usuario WHERE tipo='professor'")
     lista_professores = cursor.fetchall()
+    cursor.execute("SELECT id_disciplina, nome, codigo, periodo, id_curso FROM disciplina")
+    lista_disciplinas = cursor.fetchall()
 
     cursor.close()
     conn.close()
@@ -443,7 +494,8 @@ def adm():
     return render_template('ADM.html', cursos=lista_cursos,
                             periodos=lista_periodo,
                             alunos=lista_alunos,
-                            professores=lista_professores)
+                            professores=lista_professores,
+                            disciplinas=lista_disciplinas)
 
 
 @app.route('/cadastro', methods=['GET', 'POST'])
