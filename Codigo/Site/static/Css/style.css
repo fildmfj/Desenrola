@@ -23,7 +23,7 @@ body {
     flex-direction: column;
 }
 
-a { text-decoration: none; }
+a { text-decoration: none; } 
 
 /* ─── Logo ───────────────────────────────────────────────────── */
 .LogoSite {
