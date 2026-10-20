@@ -33,7 +33,8 @@ a { text-decoration: none; }
 }
 .LogoSite img { max-height: 90px; }
 
-/* ─── Alertas (flash) ───────────────────────────────────────── */
+/* ─── Alertas ────────────────────────────────────────────────── */
+/* .alerta (login/cadastro) */
 .alerta {
     padding: 10px 16px;
     border-radius: var(--radius);
@@ -42,8 +43,29 @@ a { text-decoration: none; }
     font-weight: 600;
     text-align: center;
 }
-.alerta-erro    { background: #fde8e8; color: var(--erro); }
-.alerta-sucesso { background: #e8f8e8; color: var(--sucesso); }
+
+/* .alert (painel ADM) */
+.alert {
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    margin-top: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    box-shadow: var(--sombra);
+}
+
+/* cores compartilhadas entre os dois tipos */
+.alerta-erro, .alert-erro, .alert-error, .alert-danger {
+    background: #fde8e8;
+    color: var(--erro);
+}
+.alerta-sucesso, .alert-sucesso, .alert-success {
+    background: #e8f8e8;
+    color: var(--sucesso);
+}
+.alert-erro, .alert-error, .alert-danger { border: 1px solid #f5c2c0; }
+.alert-sucesso, .alert-success           { border: 1px solid #c2e8c2; }
 
 /* ─── Tela Login / Cadastro ─────────────────────────────────── */
 .tela-login {
@@ -69,7 +91,7 @@ a { text-decoration: none; }
     font-size: 28px;
 }
 
-/* ─── Grupos de campo ───────────────────────────────────────── */
+/* ─── Grupos de campo (login/cadastro) ──────────────────────── */
 .campo-grupo {
     display: flex;
     flex-direction: column;
@@ -167,7 +189,6 @@ a { text-decoration: none; }
     font-weight: 700;
     cursor: pointer;
     transition: background .2s;
-    text-decoration: none;
     display: inline-block;
 }
 .btn-header:hover { background: var(--laranja); color: var(--branco); }
@@ -221,6 +242,8 @@ a { text-decoration: none; }
     color: var(--branco);
 }
 
+.nav-aluno .usuario-info { margin-left: auto; }
+
 .usuario-info {
     display: flex;
     align-items: center;
@@ -240,17 +263,28 @@ a { text-decoration: none; }
 }
 .btn-sair:hover { opacity: .85; }
 
-/* ─── Conteúdo Dashboard ────────────────────────────────────── */
-.conteudo-aluno {
+/* ─── Container de conteúdo (dashboard e painel ADM) ────────── */
+.conteudo-aluno,
+main {
     flex: 1;
-    padding: 32px 40px;
     max-width: 1100px;
     width: 100%;
     margin: 0 auto;
+    padding: 32px 40px;
 }
 
+/* ─── Seções (abas) ─────────────────────────────────────────── */
 .secao, .alerta { display: none; }
 .secao.ativo, .cursos { display: block; }
+
+.secao h1 {
+    color: var(--verde);
+    font-size: 24px;
+    margin-bottom: 10px;
+    border-bottom: 3px solid var(--laranja);
+    padding-bottom: 10px;
+    display: inline-block;
+}
 
 .secao h2 {
     color: var(--verde);
@@ -261,13 +295,19 @@ a { text-decoration: none; }
     display: inline-block;
 }
 
+.secao > p {
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
 .vazio {
     color: #888;
     font-style: italic;
     margin-top: 20px;
 }
 
-/* Cards */
+/* ─── Cards ──────────────────────────────────────────────────── */
 .grade-cards {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -319,7 +359,7 @@ a { text-decoration: none; }
     margin-bottom: 10px;
 }
 
-/* Lista de conversas */
+/* ─── Lista de conversas ─────────────────────────────────────── */
 .lista-conversas { display: flex; flex-direction: column; gap: 12px; }
 
 .item-conversa {
@@ -399,6 +439,8 @@ a { text-decoration: none; }
     transition: background .2s;
 }
 .btn-voltar:hover { background: var(--laranja); }
+
+/* ─── Chat ───────────────────────────────────────────────────── */
 .chat-overlay {
     display: none;
     position: fixed;
@@ -449,10 +491,7 @@ a { text-decoration: none; }
     transition: background .2s;
     line-height: 1;
 }
-
-.chat-header button:hover {
-    background: rgba(255,255,255,0.3);
-}
+.chat-header button:hover { background: rgba(255,255,255,0.3); }
 
 .chat-header .avatar {
     margin-bottom: 0;
@@ -561,40 +600,10 @@ a { text-decoration: none; }
 }
 .chat-input button:hover { opacity: .85; }
 
-/* ─── Gerenciador do Sistema ────────────────────────────────── */
+/* ═══ Gerenciador do Sistema (painel ADM) ═══════════════════════ */
 
-main {
-    flex: 1;
-    max-width: 1100px;
-    width: 100%;
-    margin: 0 auto;
-    padding: 32px 40px;
-}
-
-.secao {
-    display: none;
-}
-.secao.ativo {
-    display: block;
-}
-
-.secao h1 {
-    color: var(--verde);
-    font-size: 24px;
-    margin-bottom: 10px;
-    border-bottom: 3px solid var(--laranja);
-    padding-bottom: 10px;
-    display: inline-block;
-}
-
-.secao > p {
-    color: #555;
-    font-size: 14px;
-    margin-bottom: 24px;
-}
-
-/* ─── Blocos de gerenciamento (adicionar/alterar/excluir) ───── */
-.curso, .periodo, .aluno, .professor, .disciplina {
+/* Bloco de gerenciamento (adicionar / alterar / excluir) */
+.bloco {
     background: var(--verde);
     padding: 24px 28px;
     border-radius: var(--radius);
@@ -603,13 +612,12 @@ main {
     position: relative;
 }
 
-.curso h2, .periodo h2, .aluno h2, .professor h2, .disciplina h2 {
+.bloco h2 {
     color: var(--laranja);
     font-size: 18px;
-    margin-bottom: 16px;
+    margin-bottom: 0;
     display: inline-flex;
     align-items: center;
-    margin-bottom: 0;
 }
 
 /* ─── Formulários dentro dos blocos ─────────────────────────── */
@@ -618,28 +626,63 @@ main {
     flex-direction: column;
     gap: 14px;
 }
+.bloco form { margin-top: 18px; }
 
-.secao label {
+/* Rótulo que envolve o input/select */
+.campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
     color: var(--branco);
     font-weight: 600;
     font-size: 14px;
-    margin-bottom: -8px;
 }
 
-.secao input[type="text"] {
-    padding: 11px 16px;
+/* Inputs e select compartilham a mesma base */
+.secao input:is([type="text"], [type="password"], [type="email"]),
+.secao select {
     border: 2px solid transparent;
     border-radius: var(--radius);
-    background: var(--creme);
+    background-color: var(--creme);
     font-size: 14px;
     width: 100%;
     transition: border .2s;
 }
-.secao input[type="text"]:focus {
+
+.secao input:is([type="text"], [type="password"], [type="email"]) {
+    padding: 11px 16px;
+}
+
+.secao input:is([type="text"], [type="password"], [type="email"]):focus,
+.secao select:focus {
     outline: none;
     border-color: var(--laranja);
 }
 
+/* Select (curso ao adicionar disciplina) */
+.secao select {
+    padding: 11px 44px 11px 16px;
+    color: var(--texto);
+    font-family: inherit;
+    cursor: pointer;
+
+    /* seta própria no lugar da nativa */
+    appearance: none;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--verde) 50%),
+        linear-gradient(135deg, var(--verde) 50%, transparent 50%);
+    background-position:
+        calc(100% - 22px) 50%,
+        calc(100% - 16px) 50%;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+}
+.secao select:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* Botão de enviar dos formulários */
 .secao form button {
     align-self: flex-start;
     padding: 10px 24px;
@@ -658,10 +701,12 @@ main {
     transform: scale(1.02);
 }
 
-/* ─── Botões de dropdown ("Cursos existentes ▼" etc.) ───────── */
-.secao > div > button[id^="btn-alterar"],
-.secao > div > button[id^="btn-excluir"] {
+/* ─── Botão que abre o dropdown ("Cursos existentes ▼" etc.) ── */
+.bloco > .btn-dropdown {
     padding: 9px 20px;
+    margin-left: 12px;
+    margin-bottom: 5px;
+    vertical-align: middle;
     background: var(--laranja);
     color: var(--branco);
     border: none;
@@ -669,13 +714,9 @@ main {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    margin-bottom: 14px;
     transition: opacity .2s;
 }
-.secao > div > button[id^="btn-alterar"]:hover,
-.secao > div > button[id^="btn-excluir"]:hover {
-    opacity: .85;
-}
+.bloco > .btn-dropdown:hover { opacity: .85; }
 
 /* ─── Listas dropdown ────────────────────────────────────────── */
 .dropdown {
@@ -683,81 +724,84 @@ main {
     position: absolute;
     z-index: 50;
     background: var(--branco);
-    border-radius: 14px !important;
-    border: none !important;
+    border-radius: 14px;
     box-shadow: var(--sombra);
     overflow-y: auto;
-    max-height: 320px;      /* ↑ mais espaço antes de precisar rolar */
+    max-height: 320px;
     min-width: 220px;
-    margin-bottom: 0;
-    padding: 4px 0;         /* respiro interno da caixa, não do item */
+    padding: 4px 0;
 }
 
-.dropdown li {
-    list-style: none;
-}
+.dropdown li { list-style: none; }
 
-.dropdown li a {
+.dropdown-item {
     display: block;
     font-size: 14px;
     line-height: 1.2;
-    color: var(--texto) !important;
-    padding: 6px 14px !important;   /* ↓ hitbox menor por item, era 8px 14px */
+    color: var(--texto);
+    padding: 6px 14px;
     transition: background .15s;
 }
+.dropdown-item:hover { background: var(--cinza); }
 
-.dropdown li a:hover {
-    background: var(--cinza);
+/* Campo de busca dentro do dropdown (fica fixo no topo ao rolar a lista) */
+.dropdown li.dropdown-busca {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 6px 10px;
+    background: var(--branco);
 }
+.busca-dropdown {
+    width: 100%;
+    padding: 8px 14px;
+    border: 2px solid var(--cinza);
+    border-radius: 50px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border .2s;
+}
+.busca-dropdown:focus { border-color: var(--laranja); }
 
-.secao > div > button[id^="btn-alterar"],
-.secao > div > button[id^="btn-excluir"] {
-    margin-left: 12px;
-    margin-bottom: 5px;
-    vertical-align: middle;
-}
-
-/* espaço abaixo do cabeçalho (h2 + botão) antes dos campos */
-.curso form, .periodo form, .aluno form, .professor form, .disciplina form {
-    margin-top: 18px;
-}
-
-/* ─── Alertas (flash messages) — respiro e destaque ─────────── */
-.alert {
-    padding: 12px 18px;
-    border-radius: var(--radius);
-    margin-top: 22px;
-    font-size: 14px;
-    font-weight: 600;
-    text-align: center;
-    box-shadow: var(--sombra);
-}
-.alert-erro, .alert-error, .alert-danger {
-    background: #fde8e8;
-    color: var(--erro);
-    border: 1px solid #f5c2c0;
-}
-.alert-sucesso, .alert-success {
-    background: #e8f8e8;
-    color: var(--sucesso);
-    border: 1px solid #c2e8c2;
+.dropdown-vazio {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #888;
+    font-style: italic;
 }
 
-/* ─── Alertas (flash messages) ──────────────────────────────── */
-.alert {
+/* ─── Aviso: curso sem disciplinas ──────────────────────────── */
+.aviso-vazio {
+    margin: 4px 0 14px;
     padding: 10px 16px;
-    border-radius: var(--radius);
-    margin-top: 16px;
-    font-size: 14px;
+    background: var(--creme);
+    border-left: 5px solid var(--laranja);
+    border-radius: 0 12px 12px 0;
+    color: var(--verde);
+    font-size: 13px;
     font-weight: 600;
-    text-align: center;
 }
-.alert-erro, .alert-error, .alert-danger {
-    background: #fde8e8;
-    color: var(--erro);
-}
-.alert-sucesso, .alert-success {
-    background: #e8f8e8;
-    color: var(--sucesso);
+/* some quando está vazio (antes de escolher um curso) */
+.aviso-vazio:empty { display: none; }
+
+.graficos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 420px));
+    gap: 22px;
+    margin-top: 22px;
 }
 
+.card-grafico {
+    padding: 20px;
+    border-radius: 12px;
+    background: var(--branco);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .1);
+    text-align: center;
+}
+.card-grafico h2 {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.grafico-wrap { position: relative; height: 340px; }

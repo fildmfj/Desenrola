@@ -1,3 +1,4 @@
+{% import '_macros.html' as m -%}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -8,17 +9,25 @@
 </head>
 <body>
     <nav class="nav-aluno">
-            <button class="btn-nav" data-secao="db_home">Home</button>        
-            <button class="btn-nav" data-secao="db_curso">Curso</button>
-            <button class="btn-nav" data-secao="db_periodo">Período</button>
-            <button class="btn-nav" data-secao="db_aluno">Aluno</button>
-            <button class="btn-nav" data-secao="db_professor">Professor</button>
-            <button class="btn-nav" data-secao="db_disciplina">Disciplina</button>
+        <button class="btn-nav" data-secao="db_home">Home</button>
+        <button class="btn-nav" data-secao="db_curso">Curso</button>
+        <button class="btn-nav" data-secao="db_periodo">Período</button>
+        <button class="btn-nav" data-secao="db_aluno">Aluno</button>
+        <button class="btn-nav" data-secao="db_professor">Professor</button>
+        <button class="btn-nav" data-secao="db_disciplina">Disciplina</button>
+        <button class="btn-nav" data-secao="db_matricula-disciplina">Matrícula Disciplina</button>
+        <div class="usuario-info">
+            <span>{{ session['nome'] }}</span>
+            <a href="{{ url_for('logout') }}" class="btn-sair">Sair</a>
+        </div>
     </nav>
+
     <main>
+
+        <!-- ═══════════════ HOME ═══════════════ -->
         <section class="secao ativo" id="secao-db_home">
             <h1>Bem-vindo ao Gerenciador do Sistema</h1>
-            <p>Use o menu acima para gerenciar cursos, períodos, alunos e professores.</p>
+            <p>Use o menu acima para direcionar-se ao gerenciamento do sistema.</p>
             {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
@@ -29,310 +38,260 @@
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
+                <!-- ===== Dashboard: usuários ===== -->
+               <!-- ===== Dashboard ===== -->
+            <div class="graficos">
+                <div class="card-grafico">
+                    <h2>Usuários do sistema</h2>
+                    <div id="graficoUsuarios"
+                        data-alunos="{{ alunos|length }}"
+                        data-professores="{{ professores|length }}">
+                    </div>
+                </div>
+
+                <div class="card-grafico">
+                    <h2>Mensagens enviadas</h2>
+                    <div id="graficoMensagens"
+                        data-alunos="{{ msgs_alunos }}"
+                        data-professores="{{ msgs_professores }}">
+                    </div>
+                </div>
+            </div>
         </section>
+
+        <!-- ═══════════════ CURSO ═══════════════ -->
         <section class="secao" id="secao-db_curso">
             <h1>Gerenciamento de Cursos</h1>
-            <!-- ADICIONAR CURSO -->
-            <div class="curso">
+
+            <div class="bloco">
+                <h2>Adicionar Novo Curso</h2>
                 <form method="POST">
-                    <h2>Adicionar Novo Curso</h2>
-                    <label for="Insert-curso">Digite o nome do novo curso:</label>
-                    <input type="text" id="Insert-curso" name="nome_curso">
-                    <label for="Insert-sigla">Digite a sigla do curso:</label>
-                    <input type="text" id="Insert-sigla" name="sigla_curso">
-                    <button id="btn-insert-curso" name="btn" value="adicionar_curso">Adicionar Curso</button>
-                </form>    
+                    {{ m.campo('Nome do novo curso:', 'nome_curso') }}
+                    {{ m.campo('Sigla do curso:', 'sigla_curso') }}
+                    <button name="btn" value="adicionar_curso">Adicionar Curso</button>
+                </form>
             </div>
-            <!-- ALTERAR CURSO -->
-            <div class="curso">
+
+            <div class="bloco">
                 <h2>Alterar Curso</h2>
-                <button id="btn-alterar-curso">Cursos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-curso">
-                    {% for curso in cursos %}
-                        <li>
-                            <a href="#" class="item-curso" 
-                                data-id="{{ curso.id_curso }}" 
-                                data-nome="{{ curso.nome }}" 
-                                data-sigla="{{ curso.sigla }}">
-                                {{ curso.nome }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
+                {{ m.dropdown('Cursos existentes', cursos, 'nome',
+                              {'id': 'id_curso', 'nome': 'nome', 'sigla': 'sigla'}) }}
                 <form method="POST">
-                    <input type="hidden" id="input-id-curso" name="curso_id" data-fonte="data-id">
-                    <label for="input-editar-curso-nome">Digite o novo curso:</label>
-                    <input type="text" id="input-editar-curso-nome" name="novo_nome" data-fonte="data-nome">
-                    <label for="input-editar-curso-sigla">Digite a nova sigla:</label>
-                    <input type="text" id="input-editar-curso-sigla" name="nova_sigla" data-fonte="data-sigla">
-                    <button name="btn" value="alterar_curso" id="btn-confirmar-alteracao-curso">Confirmar Alteração</button>
+                    {{ m.oculto('curso_id', 'id') }}
+                    {{ m.campo('Novo nome do curso:', 'novo_nome', fonte='nome') }}
+                    {{ m.campo('Nova sigla:', 'nova_sigla', fonte='sigla') }}
+                    <button name="btn" value="alterar_curso">Confirmar Alteração</button>
                 </form>
             </div>
-            <!-- EXCLUIR CURSO -->
-            <div class="curso">
+
+            <div class="bloco">
                 <h2>Excluir Curso</h2>
-                <button type="button" id="btn-excluir-curso">Cursos existentes ▼</button>
-
-                <ul class="dropdown" id="lista-dropdown-excluir-curso">
-                    {% for curso in cursos %}
-                        <li>
-                            <a href="#" class="item-excluir-curso" 
-                                data-id="{{ curso.id_curso }}"  
-                                data-sigla="{{ curso.sigla }}">
-                                {{ curso.sigla }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-
+                {{ m.dropdown('Cursos existentes', cursos, 'sigla',
+                              {'id': 'id_curso', 'sigla': 'sigla'}) }}
                 <form method="POST">
-                    <input type="hidden" id="input-id-excluir-curso" name="curso_id" data-fonte="data-id">
-                    <label>Curso selecionado:</label>
-                    <input type="text" id="input-excluir-curso" name="excluir_sigla" data-fonte="data-sigla">
-                    <button name="btn" value="deletar_curso" id="btn-confirmar-exclusao-curso">Confirmar Exclusão</button>
+                    {{ m.oculto('curso_id', 'id') }}
+                    {{ m.campo('Curso selecionado:', 'excluir_sigla', fonte='sigla') }}
+                    <button name="btn" value="deletar_curso">Confirmar Exclusão</button>
                 </form>
             </div>
-             {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
 
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+            {{ m.flashes() }}
         </section>
+
+        <!-- ═══════════════ PERÍODO ═══════════════ -->
         <section class="secao" id="secao-db_periodo">
-            <h1>Gerenciador de Periodo</h1>
-            <!-- ADICIONAR PERIODO -->
-            <div class="periodo">
+            <h1>Gerenciamento de Períodos</h1>
+
+            <div class="bloco">
+                <h2>Adicionar Novo Período</h2>
                 <form method="POST">
-                    <h2>Adicionar Novo Periodo</h2>
-                    <label for="insert-inicio">Digite a data do começo do periodo:</label>
-                    <input type="text" id="Insert-inicio" name="inicio_periodo">
-                    <label for="Insert-fim">Digite a data do fim do periodo:</label>
-                    <input type="text" id="Insert-fim" name="fim_periodo">
-                    <label for="insert-descricao">Digite a descrição do periodo:</label>
-                    <input type="text" id="insert-descricao" name="descricao">
-                    <button id="btn-insert-periodo" name="btn" value="adicionar_periodo">Adicionar Periodo</button>
-                </form>    
-            </div>
-            <!-- ALTERAR PERIODO -->
-            <div class="periodo">
-                <h2>Alterar Periodo</h2>
-                <button id="btn-alterar-periodo">Periodo existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-periodo">
-                    {% for periodo in periodos %}
-                        <li>
-                            <a href="#" class="item-periodo" 
-                                data-id="{{ periodo.id_periodo }}" 
-                                data-inicio="{{ periodo.data_inicio.strftime('%d/%m/%Y') }}" 
-                                data-fim="{{ periodo.data_fim.strftime('%d/%m/%Y') }}" 
-                                data-descricao="{{ periodo.descricao }}">
-                                {{ periodo.descricao }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <form method="POST">
-                    <input type="hidden" id="input-id-periodo" name="periodo_id" data-fonte="data-id">
-                    <label for="input-editar-periodo-inicio">Digite a nova data de início:</label>
-                    <input type="text" id="input-editar-periodo-inicio" name="nova_data_inicio" data-fonte="data-inicio">
-                    <label for="input-editar-periodo-fim">Digite a nova data de fim:</label>
-                    <input type="text" id="input-editar-periodo-fim" name="nova_data_fim" data-fonte="data-fim">
-                    <label for="input-editar-periodo-descricao">Digite a nova descrição:</label>
-                    <input type="text" id="input-editar-periodo-descricao" name="nova_descricao" data-fonte="data-descricao">
-                    <button name="btn" value="alterar_periodo" id="btn-confirmar-alteracao-periodo">Confirmar Alteração</button>
+                    {{ m.campo('Data de começo (DD/MM/AAAA):', 'inicio_periodo') }}
+                    {{ m.campo('Data de fim (DD/MM/AAAA):', 'fim_periodo') }}
+                    {{ m.campo('Descrição do período:', 'descricao') }}
+                    <button name="btn" value="adicionar_periodo">Adicionar Período</button>
                 </form>
             </div>
-            <!-- EXCLUIR PERIODO -->
-            <div class="periodo">
-                <h2>Excluir Periodo</h2>
-                <button type="button" id="btn-excluir-periodo">Períodos existentes ▼</button>
 
-                <ul class="dropdown" id="lista-dropdown-excluir-periodo">
-                    {% for periodo in periodos %}
-                        <li>
-                            <a href="#" class="item-excluir-periodo"
-                                data-id="{{ periodo.id_periodo }}"
-                                data-descricao="{{ periodo.descricao }}">
-                                {{ periodo.descricao }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-
+            <div class="bloco">
+                <h2>Alterar Período</h2>
+                {# inicio_br / fim_br vêm formatadas do app.py #}
+                {{ m.dropdown('Períodos existentes', periodos, 'descricao',
+                              {'id': 'id_periodo', 'inicio': 'inicio_br',
+                               'fim': 'fim_br', 'descricao': 'descricao'}) }}
                 <form method="POST">
-                    <input type="hidden" id="input-id-excluir-periodo" name="periodo_id" data-fonte="data-id">
-                    <label>Período selecionado:</label>
-                    <input type="text" id="input-excluir-periodo" name="excluir_periodo" data-fonte="data-descricao">
-                    <button name="btn" value="deletar_periodo" id="btn-confirmar-exclusao-periodo">Confirmar Exclusão</button>
+                    {{ m.oculto('periodo_id', 'id') }}
+                    {{ m.campo('Nova data de início:', 'nova_data_inicio', fonte='inicio') }}
+                    {{ m.campo('Nova data de fim:', 'nova_data_fim', fonte='fim') }}
+                    {{ m.campo('Nova descrição:', 'nova_descricao', fonte='descricao') }}
+                    <button name="btn" value="alterar_periodo">Confirmar Alteração</button>
                 </form>
             </div>
-             {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="alert alert-{{ category }}">
-                            {{ message }}
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
+
+            <div class="bloco">
+                <h2>Excluir Período</h2>
+                {{ m.dropdown('Períodos existentes', periodos, 'descricao',
+                              {'id': 'id_periodo', 'descricao': 'descricao'}) }}
+                <form method="POST">
+                    {{ m.oculto('periodo_id', 'id') }}
+                    {{ m.campo('Período selecionado:', 'excluir_periodo', fonte='descricao') }}
+                    <button name="btn" value="deletar_periodo">Confirmar Exclusão</button>
+                </form>
+            </div>
+
+            {{ m.flashes() }}
         </section>
+
+        <!-- ═══════════════ ALUNO ═══════════════ -->
         <section class="secao" id="secao-db_aluno">
             <h1>Gerenciamento de Alunos</h1>
-            <!-- ADCIONAR ALUNO -->
-            <div class="aluno">
-                <form method="POST"> 
-                    <h2>Adicionar Novo Aluno</h2>
-                    <label for="Insert-matricula">Digite a matrícula do aluno:</label>
-                    <input type="text" id="Insert-matricula" name="matricula_aluno">
-                    <label for="Insert-nome">Digite o nome do aluno:</label>
-                    <input type="text" id="Insert-nome" name="nome_aluno">
-                    <label for="Insert-email">Digite o email do aluno:</label>
-                    <input type="text" id="Insert-email" name="email_aluno">
-                    <label for="Insert-senha">Digite a senha do aluno:</label>
-                    <input type="text" id="Insert-senha" name="senha_aluno">
+
+            <div class="bloco">
+                <h2>Adicionar Novo Aluno</h2>
+                <form method="POST">
+                    {{ m.campo('Matrícula do aluno:', 'matricula_aluno') }}
+                    {{ m.campo('Nome do aluno:', 'nome_aluno') }}
+                    {{ m.campo('Email do aluno:', 'email_aluno') }}
+                    {{ m.campo('Senha do aluno:', 'senha_aluno', tipo='password') }}
                     <button type="submit" name="btn" value="adicionar_aluno">Adicionar Aluno</button>
                 </form>
             </div>
-            <!-- ALTERAR ALUNO -->
-            <div class="aluno"> 
+
+            <div class="bloco">
                 <h2>Alterar Aluno</h2>
-                <button id="btn-alterar-aluno">Alunos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-aluno">
-                    {% for aluno in alunos %}
-                        <li>
-                            <a href="#" class="item-aluno"
-                                data-id="{{ aluno.id_usuario }}"
-                                data-matricula="{{ aluno.identificacao }}"
-                                data-nome="{{ aluno.nome }}"
-                                data-email="{{ aluno.email }}">
-                                {{ aluno.identificacao }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <form method="POST"> 
-                    <input type="hidden" id="input-id-aluno" name="id_usuario" data-fonte="data-id">
-                    <label for="Insert-matricula-alterar">Digite a nova matrícula do aluno/a:</label>
-                    <input type="text" id="Insert-matricula-alterar" name="matricula_aluno" data-fonte="data-matricula">
-                    <label for="Insert-nome-alterar">Digite o novo nome do aluno/a:</label>
-                    <input type="text" id="Insert-nome-alterar" name="nome_aluno" data-fonte="data-nome">
-                    <label for="Insert-email-alterar">Digite o novo email do aluno/a:</label>
-                    <input type="text" id="Insert-email-alterar" name="email_aluno" data-fonte="data-email">
-                    <label for="Insert-senha-alterar">Digite a nova senha do aluno/a:</label>
-                    <input type="text" id="Insert-senha-alterar" name="senha_aluno">
-                    <button type="submit" name="btn" value="alterar_aluno" id="btn-alterar-aluno">Alterar Aluno</button>
+                {{ m.dropdown('Alunos existentes', alunos, ['identificacao', 'nome'],
+                              {'id': 'id_usuario', 'matricula': 'identificacao',
+                               'nome': 'nome', 'email': 'email'}, buscar=['identificacao', 'nome'], placeholder='Buscar por nome ou matrícula...') }}
+                <form method="POST">
+                    {{ m.oculto('id_usuario', 'id') }}
+                    {{ m.campo('Nova matrícula:', 'matricula_aluno', fonte='matricula') }}
+                    {{ m.campo('Novo nome:', 'nome_aluno', fonte='nome') }}
+                    {{ m.campo('Novo email:', 'email_aluno', fonte='email') }}
+                    {{ m.campo('Nova senha (deixe em branco para manter):', 'senha_aluno', tipo='password') }}
+                    <button type="submit" name="btn" value="alterar_aluno">Alterar Aluno</button>
                 </form>
             </div>
-            <!-- EXCLUIR ALUNO -->
-            <div class="aluno">
-                <h2>Excluir Aluno</h2>
-                <button id="btn-excluir-aluno">Alunos existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-excluir-aluno">
-                    {% for aluno in alunos %}
-                        <li>
-                            <a href="#" class="item-excluir-aluno"
-                                data-id="{{ aluno.id_usuario }}"
-                                data-matricula="{{ aluno.identificacao }}">
-                                {{ aluno.identificacao }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <form method="POST"> 
-                    
-                    <label for="Insert-matricula-excluir">Digite a matrícula do aluno/a:</label>
-                    <input type="text" id="Insert-matricula-excluir" name="matricula_aluno" data-fonte="data-matricula">
-                    <button type="submit" name="btn" value="deletar_aluno" id="btn-excluir-aluno">Excluir Aluno</button>
-                </form>
 
-        </section>    
+            <div class="bloco">
+                <h2>Excluir Aluno</h2>
+                {{ m.dropdown('Alunos existentes', alunos, 'identificacao',
+                              {'matricula': 'identificacao'}, buscar=['identificacao', 'nome'], placeholder='Buscar por nome ou matrícula...') }}
+                <form method="POST">
+                    {{ m.campo('Matrícula do aluno:', 'matricula_aluno', fonte='matricula') }}
+                    <button type="submit" name="btn" value="deletar_aluno">Excluir Aluno</button>
+                </form>
+            </div>
+
+            {{ m.flashes() }}
+        </section>
+
+        <!-- ═══════════════ PROFESSOR ═══════════════ -->
         <section class="secao" id="secao-db_professor">
             <h1>Gerenciamento de Professores</h1>
-            <!-- ADICIONAR PROFESSOR -->
-            <div class="professor"> 
-                <h2>Adicionar Novos Professores</h2>
-                <form method="POST"> 
-                    <label for="insert-id-professor"> Digite o SIAPE do/a professor/a:</label>
-                    <input type="text" id="insert-id-professor" name="siape_professor">
-                    <label for="insert-nome-professor">Digite o nome do/a professor/a:</label>
-                    <input type="text" id="insert-nome-professor" name="nome_professor">
-                    <label for="insert-email-professor">Digite o email do/a professor/a:</label>
-                    <input type="text" id="insert-email-professor" name="email_professor">
-                    <label for="insert-senha-professor">Digite a senha do/a professor/a:</label>
-                    <input type="text" id="insert-senha-professor" name="senha_professor">
+
+            <div class="bloco">
+                <h2>Adicionar Novo Professor</h2>
+                <form method="POST">
+                    {{ m.campo('SIAPE do/a professor/a:', 'siape_professor') }}
+                    {{ m.campo('Nome do/a professor/a:', 'nome_professor') }}
+                    {{ m.campo('Email do/a professor/a:', 'email_professor') }}
+                    {{ m.campo('Senha do/a professor/a:', 'senha_professor', tipo='password') }}
                     <button type="submit" name="btn" value="adicionar_professor">Adicionar Professor</button>
                 </form>
             </div>
-            <div class="professor">
-                <h2>Alterar Professores</h2>
-                <button id="btn-alterar-professor">Professores existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-professor" >
-                    {% for professor in professores %}
-                        <li>
-                            <a href="#" class="item-professor"
-                                data-id="{{ professor.id_usuario }}"
-                                data-siape="{{ professor.identificacao }}"
-                                data-nome="{{ professor.nome }}"
-                                data-email="{{ professor.email }}">
-                                {{ professor.nome }} 
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
+
+            <div class="bloco">
+                <h2>Alterar Professor</h2>
+                {{ m.dropdown('Professores existentes', professores, 'nome',
+                              {'id': 'id_usuario', 'siape': 'identificacao',
+                               'nome': 'nome', 'email': 'email'}, buscar=['identificacao', 'nome'], placeholder='Buscar por nome ou SIAPE...') }}
                 <form method="POST">
-                    <input type="hidden" id="input-id-professor" name="id_usuario" data-fonte="data-id">
-                    <label for="insert-id-professor-alterar">Digite o SIAPE do/a professor/a:</label>
-                    <input type="text" id="insert-id-professor-alterar" name="siape_professor" data-fonte="data-siape">
-                    <label for="insert-nome-professor-alterar">Digite o novo nome do/a professor/a:</label>
-                    <input type="text" id="insert-nome-professor-alterar" name="nome_professor" data-fonte="data-nome">
-                    <label for="insert-email-professor-alterar">Digite o novo email do/a professor/a:</label>
-                    <input type="text" id="insert-email-professor-alterar" name="email_professor" data-fonte="data-email">
-                    <label for="insert-senha-professor-alterar">Digite a nova senha do/a professor/a:</label>
-                    <input type="text" id="insert-senha-professor-alterar" name="senha_professor">
-                    <button type="submit" name="btn" value="alterar_professor" id="btn-alterar-professor">Alterar Professor/a</button>
+                    {{ m.oculto('id_usuario', 'id') }}
+                    {{ m.campo('SIAPE:', 'siape_professor', fonte='siape') }}
+                    {{ m.campo('Novo nome:', 'nome_professor', fonte='nome') }}
+                    {{ m.campo('Novo email:', 'email_professor', fonte='email') }}
+                    {{ m.campo('Nova senha (deixe em branco para manter):', 'senha_professor', tipo='password') }}
+                    <button type="submit" name="btn" value="alterar_professor">Alterar Professor/a</button>
                 </form>
             </div>
-            <div class="professor">
-                <h2>Excluir Professores</h2>
-                <button id="btn-excluir-professor">Professores existentes ▼</button>
-                <ul class="dropdown" id="lista-dropdown-excluir-professor" >
-                    {% for professor in professores %}
-                        <li>
-                            <a href="#" class="item-excluir-professor"
-                            data-id="{{ professor.id_usuario }}"
-                            data-siape="{{ professor.identificacao }}">
-                                {{ professor.nome }}
-                            </a>
-                        </li>
-                    {% endfor %}
-                </ul>
-                <form method="POST"> 
-                    <label for="insert-id-professor-excluir">Digite o SIAPE do/a professor/a:</label>
-                    <input type="text" id="insert-id-professor-excluir" name="siape_professor" data-fonte="data-siape">
-                    <button type="submit" name="btn" value="deletar_professor" id="btn-excluir-professor">Excluir Professor/a</button>
+
+            <div class="bloco">
+                <h2>Excluir Professor</h2>
+                {{ m.dropdown('Professores existentes', professores, 'nome',
+                              {'siape': 'identificacao'}, buscar=['identificacao', 'nome'], placeholder='Buscar por nome ou SIAPE...') }}
+                <form method="POST">
+                    {{ m.campo('SIAPE do/a professor/a:', 'siape_professor', fonte='siape') }}
+                    <button type="submit" name="btn" value="deletar_professor">Excluir Professor/a</button>
                 </form>
+            </div>
+
+            {{ m.flashes() }}
         </section>
+
+        <!-- ═══════════════ DISCIPLINA ═══════════════ -->
         <section class="secao" id="secao-db_disciplina">
             <h1>Gerenciamento de Disciplinas</h1>
-            <!-- ADICIONAR DISCIPLINAS-->
-            <div class="disciplina">
-                <h2>Adicionar Novas Disciplinas</h2>
+
+            <div class="bloco">
+                <h2>Adicionar Nova Disciplina</h2>
                 <form method="POST">
-                    <label for="insert-nome-disciplina">Digite o nome da disciplina:</label>
-                    <input type="text" id="insert-nome-disciplina" name="nome_disciplina">
-                    <label for="insert-cod-disciplina">Digite o código da disciplina:</label>
-                    <input type="text" id="insert-cod-disciplina" name="cod_disciplina">
-                    <label for="insert-periodo-disciplina">Digite o período da disciplina:</label>
-                    <input type="text" id="insert-periodo-disciplina" name="periodo_disciplina">
-                    <label for="insert-id-curso-disciplina">Digite o ID do curso:</label>
-                    <input type="text" id="insert-id-curso-disciplina" name="id_curso_disciplina">
+                    {{ m.campo('Nome da disciplina:', 'nome_disciplina') }}
+                    {{ m.campo('Código da disciplina:', 'cod_disciplina') }}
+                    {{ m.campo('Período da disciplina:', 'periodo_disciplina') }}
+                    {{ m.selecao('Curso:', 'sigla_curso', cursos, 'sigla', 'nome') }}
+                    <button type="submit" name="btn" value="adicionar_disciplina">Adicionar Disciplina</button>
                 </form>
             </div>
+
+            {# data-filtro liga o script que mostra só as disciplinas do curso escolhido #}
+            <div class="bloco" data-filtro>
+                <h2>Alterar Disciplina</h2>
+                {{ m.dropdown('Cursos existentes', cursos, 'nome',
+                              {'sigla': 'sigla', 'nome-curso': 'nome'}) }}
+                {{ m.dropdown('Disciplinas do curso', disciplinas, 'nome',
+                              {'curso-sigla': 'curso_sigla', 'codigo': 'codigo',
+                               'nome': 'nome', 'periodo': 'periodo'}, oculto=True) }}
+                <p class="aviso-vazio"></p>
+
+                <form method="POST">
+                    {{ m.oculto('codigo_original', 'codigo') }}
+                    {{ m.campo('Curso:', fonte='nome-curso', desabilitado=True) }}
+                    {{ m.campo('Nome da disciplina:', 'nome_disciplina', fonte='nome') }}
+                    {{ m.campo('Código da disciplina:', 'cod_disciplina', fonte='codigo') }}
+                    {{ m.campo('Período da disciplina:', 'periodo_disciplina', fonte='periodo') }}
+                    <button type="submit" name="btn" value="alterar_disciplina">Alterar Disciplina</button>
+                </form>
+            </div>
+
+            <div class="bloco">
+                <h2>Excluir Disciplina</h2>
+                {{ m.dropdown('Disciplinas existentes', disciplinas, 'nome',
+                              {'codigo': 'codigo', 'nome': 'nome'}) }}
+                <form method="POST">
+                    {{ m.oculto('cod_disciplina', 'codigo') }}
+                    {{ m.campo('Disciplina selecionada:', fonte='nome', desabilitado=True) }}
+                    <button type="submit" name="btn" value="deletar_disciplina">Excluir Disciplina</button>
+                </form>
+            </div>
+
+            {{ m.flashes() }}
         </section>
+
+        <!-- ═══════════════ MATRÍCULA EM DISCIPLINA ═══════════════ -->
+        <section class="secao" id="secao-db_matricula-disciplina">
+            <h1>Gerenciar Matrículas em Disciplinas</h1>
+
+            <div class="bloco">
+                <h2>Matricular Aluno em Disciplina</h2>
+                <form method="POST">
+                    {{ m.campo('Matrícula do aluno:', 'matricula_aluno') }}
+                    {{ m.campo('Código da disciplina:', 'cod_disciplina') }}
+                    <button type="submit" name="btn" value="matricular_aluno">Matricular Aluno</button>
+                </form>
+            </div>
+
+            {{ m.flashes() }}
+        </section>
+
     </main>
     <script src="{{ url_for('static', filename='Js/script.js') }}"></script>
 </body>

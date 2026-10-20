@@ -1,0 +1,62 @@
+{# Campo de texto/senha. 'fonte' = nome do data-* que preenche o campo (sem o prefixo "data-") #}
+{% macro campo(rotulo, name=None, tipo='text', fonte=None, desabilitado=False) -%}
+<label class="campo">
+    {{ rotulo }}
+    <input type="{{ tipo }}"
+        {%- if name %} name="{{ name }}"{% endif %}
+        {%- if fonte %} data-fonte="data-{{ fonte }}"{% endif %}
+        {%- if desabilitado %} disabled{% endif %}>
+</label>
+{%- endmacro %}
+
+{# Input oculto que recebe um valor do item clicado no dropdown #}
+{% macro oculto(name, fonte) -%}
+<input type="hidden" name="{{ name }}" data-fonte="data-{{ fonte }}">
+{%- endmacro %}
+
+{# <select> preenchido com uma lista. 'valor' e 'texto' são as colunas usadas #}
+{% macro selecao(rotulo, name, itens, valor, texto) -%}
+<label class="campo">
+    {{ rotulo }}
+    <select name="{{ name }}">
+        <option value="">Selecione...</option>
+        {% for item in itens %}
+            <option value="{{ item[valor] }}">{{ item[texto] }}</option>
+        {% endfor %}
+    </select>
+</label>
+{%- endmacro %}
+
+{# Botão + lista dropdown.
+   texto: coluna exibida (string) ou lista de colunas (juntadas com " - ")
+   dados: mapeia data-atributo -> coluna da linha #}
+{% macro dropdown(rotulo, itens, texto, dados, oculto=False, buscar=None, placeholder='Buscar...') -%}
+<button type="button" class="btn-dropdown"{% if oculto %} hidden{% endif %}>{{ rotulo }} ▼</button>
+<ul class="dropdown">
+    {% if buscar %}
+        <li class="dropdown-busca">
+            <input type="search" class="busca-dropdown" placeholder="{{ placeholder }}" autocomplete="off">
+        </li>
+    {% endif %}
+    {% for item in itens %}
+        <li>
+            <a href="#" class="dropdown-item"
+                {%- for attr, coluna in dados.items() %} data-{{ attr }}="{{ item[coluna] }}"{% endfor %}
+                {%- if buscar %} data-busca="{% for c in buscar %}{{ item[c] }} {% endfor %}"{% endif %}>
+                {%- if texto is string -%}
+                    {{ item[texto] }}
+                {%- else -%}
+                    {%- for t in texto %}{{ item[t] }}{% if not loop.last %} - {% endif %}{% endfor -%}
+                {%- endif -%}
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+{%- endmacro %}
+
+{# Mensagens flash #}
+{% macro flashes() -%}
+{% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ categoria }}">{{ mensagem }}</div>
+{% endfor %}
+{%- endmacro %}
