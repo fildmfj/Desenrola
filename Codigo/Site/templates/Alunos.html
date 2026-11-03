@@ -15,6 +15,7 @@
             <button class="btn-nav ativo" data-secao="disciplinas">Minhas Disciplinas</button>
             <button class="btn-nav" data-secao="professores">Meus Professores</button>
             <button class="btn-nav" data-secao="conversas">Minhas Conversas</button>
+            <button class="btn-nav" data-secao="feedbacks">Meus Feedbacks <span class="badge-aba" id="badge-respostas" hidden>0</span></button>
         </nav>
         <div class="usuario-info">
             <span>Olá, {{ session.nome }}</span>
@@ -23,6 +24,21 @@
     </header>
 
     <main class="conteudo-aluno">
+        {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+            <div class="alert alert-{{ categoria }}">{{ mensagem }}</div>
+        {% endfor %}
+        {% if disciplinas %}
+            <div class="faixa-feedback">
+                <div>
+                    <strong>Sua opinião importa!</strong>
+                    <span>Conte como estão o professor, as aulas, o plano de ensino e as disciplinas.</span>
+                </div>
+                <button type="button" class="btn-feedback"
+                        onclick="document.getElementById('dialog-feedback').showModal()">
+                    Enviar feedback
+                </button>
+            </div>
+        {% endif %}
         <!-- Disciplinas -->
         <section id="secao-disciplinas" class="secao ativo">
             <h2>Minhas Disciplinas</h2>
@@ -78,7 +94,67 @@
                 <p class="vazio">Nenhuma conversa iniciada ainda.</p>
             {% endif %}
         </section>
+
+        <!-- Meus Feedbacks -->
+        <section id="secao-feedbacks" class="secao">
+            <h2>Meus Feedbacks</h2>
+            <div id="lista-meus-feedbacks" class="lista-feedbacks"></div>
+        </section>
     </main>
+
+    <dialog id="dialog-meu-feedback" class="dialog-feedback dialog-largo">
+        <div class="dialog-topo">
+            <h2 id="titulo-meu-feedback">Meu feedback</h2>
+            <button type="button" class="dialog-fechar" onclick="this.closest('dialog').close()">✕</button>
+        </div>
+        <article id="detalhe-meu-feedback" class="detalhe-feedback"></article>
+    </dialog>
+    
+    <dialog id="dialog-feedback" class="dialog-feedback">
+        <form method="POST" action="{{ url_for('enviar_feedback') }}">
+            <h2>Enviar feedback</h2>
+
+            <label class="campo">
+                Disciplina:
+                <select name="disciplina" required>
+                    <option value="">Selecione...</option>
+                    {% for d in disciplinas %}
+                        <option value="{{ d.id_disciplina_periodo }}">
+                            {{ d.nome }} ({{ d.curso_sigla }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="campo">
+                Tópico:
+                <select name="topico" required>
+                    <option value="">Selecione...</option>
+                    {% for chave, nome in topicos_feedback.items() %}
+                        <option value="{{ chave }}">{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="campo">
+                Seu feedback:
+                <textarea id="texto-feedback" name="texto" rows="6" maxlength="2000" required></textarea>
+                <small class="contador"><span id="contador-feedback">0</span>/2000</small>
+            </label>
+            <label class="interruptor">
+                <span class="interruptor-info">
+                    <strong>Anônimo</strong>
+                    <small>Seu nome não aparece para quem lê o feedback.</small>
+                </span>
+                <input type="checkbox" name="anonimo" value="1">
+                <span class="trilho"></span>
+            </label>
+            <div class="dialog-acoes">
+                <button type="submit">Enviar</button>
+                <button type="button" onclick="this.closest('dialog').close()">Cancelar</button>
+            </div>
+        </form>
+    </dialog>
 
     <div class="chat-overlay" id="chat-overlay" style="display:none"></div>
     <div class="chat-panel" id="chat-panel">

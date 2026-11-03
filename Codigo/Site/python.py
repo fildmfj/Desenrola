@@ -80,6 +80,15 @@ def detectar_tipo(identi):
         return 'adm'
     return None
 
+TOPICOS_FEEDBACK = {
+    'professor':    'Professor',
+    'plano_ensino': 'Plano de ensino',
+    'aula':         'Aula',
+    'disciplina':   'Disciplina',
+    'avaliacoes':   'Avaliações',
+    'material':     'Material didático',
+    'outro':        'Outro',
+}
 
 def destino_por_tipo(tipo):
     """Redirect para o painel do tipo, ou None se o tipo for desconhecido."""
@@ -756,7 +765,8 @@ def alunos():
                 c.sigla AS curso_sigla,
                 u.nome  AS professor_nome,
                 p.descricao AS periodo_descricao,
-                m.situacao
+                m.situacao,
+                dp.id_disciplina_periodo
             FROM matricula_disciplina m
             JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = m.id_disciplina
             JOIN disciplina d  ON d.id_disciplina  = dp.id_disciplina
@@ -785,8 +795,219 @@ def alunos():
     return render_template('Alunos.html',
                            disciplinas=lista_disciplinas,
                            professores=lista_professores,
-                           conversas=conversas)
+                           conversas=conversas,
+                           topicos_feedback=TOPICOS_FEEDBACK)
 
+def meu_feedback_para_json(r):
+    texto = r['texto']
+    return {
+        'id': r['id_feedback'],
+        'topico': TOPICOS_FEEDBACK.get(r['topico'], r['topico']),
+        'disciplina': r['disciplina'],
+        'periodo': r['periodo'],
+        'texto': texto,
+        'resumo': ' '.join(texto.split())[:120],
+        'data': r['criado_em'].strftime('%d/%m/%Y %H:%M'),
+        'anonimo': bool(r['anonimo']),
+        'resposta': r['resposta'],
+        'respondido_em': r['respondido_em'].strftime('%d/%m/%Y %H:%M') if r['respondido_em'] else None,
+        'resposta_nova': bool(r['resposta']) and not r['resposta_lida'],
+    }
+
+
+@app.route('/api/meus-feedbacks')
+@acesso('aluno')
+def api_meus_feedbacks():
+    with db() as (conn, cursor):
+        linhas = listar(cursor, '''
+            SELECT f.id_feedback, f.topico, f.texto, f.criado_em, f.anonimo,
+                   f.resposta, f.respondido_em, f.resposta_lida,
+                   d.nome AS disciplina, p.descricao AS periodo
+            FROM feedback f
+            JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
+            JOIN disciplina d ON d.id_disciplina = dp.id_disciplina
+            JOIN periodo p ON p.id_periodo = dp.id_periodo
+            WHERE f.id_aluno = %s
+            ORDER BY f.criado_em DESC
+            LIMIT 200
+        ''', (session['usuario_id'],))
+    return {'feedbacks': [meu_feedback_para_json(r) for r in linhas]}
+
+
+@app.route('/api/meus-feedbacks/<int:id_feedback>/lido', methods=['POST'])
+@acesso('aluno')
+def api_meu_feedback_lido(id_feedback):
+    with db() as (conn, cursor):
+        cursor.execute(
+            'UPDATE feedback SET resposta_lida = TRUE WHERE id_feedback = %s AND id_aluno = %s',
+            (id_feedback, session['usuario_id'])
+        )
+        conn.commit()
+    return {'ok': True}
+
+@app.route('/feedback', methods=['POST'])
+@acesso('aluno')
+def enviar_feedback():
+    topico = request.form.get('topico', '')
+    # o navegador manda quebra de linha como \r\n; contamos como 1 caractere
+    texto = request.form.get('texto', '').replace('\r\n', '\n').strip()
+    anonimo = 1 if request.form.get('anonimo') else 0
+    try:
+        id_dp = int(request.form.get('disciplina', ''))
+    except ValueError:
+        id_dp = None
+
+    if id_dp is None or topico not in TOPICOS_FEEDBACK:
+        flash('Selecione a disciplina e o tópico.', 'erro')
+        
+    elif not texto:
+        flash('Escreva o seu feedback.', 'erro')
+    elif len(texto) > 2000:
+        flash('O feedback pode ter no máximo 2000 caracteres.', 'erro')
+    else:
+        with db() as (conn, cursor):
+            # confere se o aluno realmente está matriculado nessa disciplina
+            cursor.execute(
+                'SELECT 1 FROM matricula_disciplina WHERE id_aluno = %s AND id_disciplina = %s',
+                (session['usuario_id'], id_dp)
+            )
+            if not cursor.fetchone():
+                flash('Você não está matriculado nessa disciplina.', 'erro')
+            else:
+                cursor.execute(
+                    'INSERT INTO feedback (id_aluno, id_disciplina_periodo, topico, texto, anonimo) '
+                    'VALUES (%s, %s, %s, %s, %s)',
+                    (session['usuario_id'], id_dp, topico, texto, anonimo)
+                )
+                conn.commit()
+                flash('Feedback enviado! Obrigado.', 'sucesso')
+                notificar_professor(cursor, id_dp, topico)
+
+    return redirect(url_for('alunos'))
+
+def feedback_para_json(r):
+    texto = r['texto']
+    return {
+        'id': r['id_feedback'],
+        'topico': TOPICOS_FEEDBACK.get(r['topico'], r['topico']),
+        'disciplina': r['disciplina'],
+        'periodo': r['periodo'],
+        'autor': r['autor'],                 # None quando o aluno enviou como anônimo
+        'texto': texto,
+        'resumo': ' '.join(texto.split())[:120],
+        'data': r['criado_em'].strftime('%d/%m/%Y %H:%M'),
+        'lido': bool(r['lido']),
+        'resposta': r['resposta'],
+        'respondido_em': r['respondido_em'].strftime('%d/%m/%Y %H:%M') if r['respondido_em'] else None,
+    }
+
+
+@app.route('/api/feedbacks')
+@acesso('professor')
+def api_feedbacks():
+    """?novos=1 → só os não lidos | ?disciplina=<id> → todos daquela disciplina."""
+    filtros = ['dp.id_professor = %s']
+    params = [session['usuario_id']]
+
+    if request.args.get('novos'):
+        filtros.append('f.lido = FALSE')
+    id_disciplina = request.args.get('disciplina', type=int)
+    if id_disciplina:
+        filtros.append('dp.id_disciplina = %s')
+        params.append(id_disciplina)
+
+    # os filtros acima são fixos; só os valores entram como parâmetros
+    with db() as (conn, cursor):
+        linhas = listar(cursor, f'''
+            SELECT f.id_feedback, f.topico, f.texto, f.criado_em, f.lido, f.resposta, f.respondido_em,
+                   CASE WHEN f.anonimo = 1 THEN NULL ELSE u.nome END AS autor,
+                   d.nome AS disciplina,
+                   p.descricao AS periodo
+            FROM feedback f
+            JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
+            JOIN disciplina d ON d.id_disciplina = dp.id_disciplina
+            JOIN periodo p ON p.id_periodo = dp.id_periodo
+            JOIN usuario u ON u.id_usuario = f.id_aluno
+            WHERE {' AND '.join(filtros)}
+            ORDER BY f.criado_em DESC
+            LIMIT 200
+        ''', tuple(params))
+
+    return {'feedbacks': [feedback_para_json(r) for r in linhas]}
+
+
+@app.route('/api/feedbacks/<int:id_feedback>/lido', methods=['POST'])
+@acesso('professor')
+def api_feedback_lido(id_feedback):
+    with db() as (conn, cursor):
+        # o JOIN garante que só o professor da disciplina marca como lido
+        cursor.execute('''
+            UPDATE feedback f
+            JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
+            SET f.lido = TRUE
+            WHERE f.id_feedback = %s AND dp.id_professor = %s
+        ''', (id_feedback, session['usuario_id']))
+        conn.commit()
+    return {'ok': True}
+
+
+def notificar_professor(cursor, id_dp, topico):
+    """Avisa em tempo real o professor da disciplina. Não envia o autor."""
+    cursor.execute('''
+        SELECT dp.id_professor, d.nome AS disciplina
+        FROM disciplina_periodo dp
+        JOIN disciplina d ON d.id_disciplina = dp.id_disciplina
+        WHERE dp.id_disciplina_periodo = %s
+    ''', (id_dp,))
+    alvo = cursor.fetchone()
+    if alvo and alvo['id_professor']:
+        socketio.emit('novo_feedback',
+                      {'disciplina': alvo['disciplina'], 'topico': TOPICOS_FEEDBACK[topico]},
+                      to=f"usuario_{alvo['id_professor']}")
+
+@app.route('/api/feedbacks/<int:id_feedback>/responder', methods=['POST'])
+@acesso('professor')
+def api_feedback_responder(id_feedback):
+    texto = ((request.get_json(silent=True) or {}).get('texto') or '').replace('\r\n', '\n').strip()
+    if not texto:
+        return {'erro': 'Escreva a resposta.'}, 400
+    if len(texto) > 2000:
+        return {'erro': 'A resposta pode ter no máximo 2000 caracteres.'}, 400
+
+    with db() as (conn, cursor):
+        # o JOIN garante que só o professor da disciplina responde,
+        # e "resposta IS NULL" impede responder duas vezes
+        cursor.execute('''
+            UPDATE feedback f
+            JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
+            SET f.resposta = %s, f.respondido_em = NOW(),
+                f.resposta_lida = FALSE, f.lido = TRUE
+            WHERE f.id_feedback = %s AND dp.id_professor = %s AND f.resposta IS NULL
+        ''', (texto, id_feedback, session['usuario_id']))
+        conn.commit()
+        if cursor.rowcount == 0:
+            return {'erro': 'Feedback não encontrado ou já respondido.'}, 404
+
+        notificar_aluno_resposta(cursor, id_feedback)
+        cursor.execute('SELECT respondido_em FROM feedback WHERE id_feedback = %s', (id_feedback,))
+        quando = cursor.fetchone()['respondido_em']
+
+    return {'ok': True, 'resposta': texto, 'respondido_em': quando.strftime('%d/%m/%Y %H:%M')}
+
+
+def notificar_aluno_resposta(cursor, id_feedback):
+    """Avisa o aluno em tempo real. Funciona igual para feedback anônimo."""
+    cursor.execute('''
+        SELECT f.id_aluno, d.nome AS disciplina
+        FROM feedback f
+        JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
+        JOIN disciplina d ON d.id_disciplina = dp.id_disciplina
+        WHERE f.id_feedback = %s
+    ''', (id_feedback,))
+    alvo = cursor.fetchone()
+    if alvo:
+        socketio.emit('feedback_respondido', {'disciplina': alvo['disciplina']},
+                      to=f"usuario_{alvo['id_aluno']}")
 
 @app.route('/professores')
 @acesso('professor')
@@ -881,6 +1102,10 @@ def sala_do_chat(id_a, id_b):
     """Sala única entre dois usuários, independente de quem iniciou."""
     return '_'.join(sorted([str(id_a), str(id_b)]))
 
+@socketio.on('connect')
+def ao_conectar():
+    if 'usuario_id' in session:
+        join_room(f"usuario_{session['usuario_id']}")
 
 @socketio.on('entrar_sala')
 def entrar_sala(data):

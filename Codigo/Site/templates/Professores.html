@@ -17,6 +17,9 @@
             <button class="btn-nav" data-secao="conversas">Conversas</button>
         </nav>
         <div class="usuario-info">
+            <button type="button" class="btn-notificacao" id="btn-notificacao" aria-label="Feedbacks novos">
+                🔔<span class="badge-notificacao" id="badge-feedback" hidden>0</span>
+            </button>
             <span>Olá, Prof. {{ session.nome }}</span>
             <a href="{{ url_for('logout') }}" class="btn-sair">Sair</a>
         </div>
@@ -28,7 +31,7 @@
             {% if disciplinas %}
                 <div class="grade-cards">
                     {% for d in disciplinas %}
-                    <div class="card-disciplina">
+                    <div class="card-disciplina" data-id-disciplina="{{ d.id_disciplina }}" data-nome="{{ d.nome }}">
                         <span class="codigo-disciplina">{{ d.codigo }}</span>
                         <h3>{{ d.nome }}</h3>
                         <p>{{ d.curso_nome }}</p>
@@ -76,6 +79,17 @@
             {% endif %}
         </section>
     </main>
+    
+    <dialog id="dialog-feedbacks" class="dialog-feedback dialog-largo">
+        <div class="dialog-topo">
+            <button type="button" class="dialog-voltar" id="voltar-feedbacks" aria-label="Voltar à lista" hidden>←</button>
+            <h2 id="titulo-feedbacks">Novos feedbacks</h2>
+            <button type="button" class="dialog-fechar" onclick="this.closest('dialog').close()">✕</button>
+        </div>
+        <div id="lista-feedbacks" class="lista-feedbacks"></div>
+        <article id="detalhe-feedback" class="detalhe-feedback" hidden></article>
+    </dialog>
+
     <div class="chat-overlay" id="chat-overlay" style="display:none"></div>
     <div class="chat-panel" id="chat-panel">
         <div class="chat-header">

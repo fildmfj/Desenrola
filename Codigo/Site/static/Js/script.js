@@ -160,6 +160,8 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         socket.on('nova_mensagem', msg => { adicionarMensagem(msg, true); atualizarListaConversas(msg); });
+        socket.on('novo_feedback', d => { if (window.notificarFeedback) window.notificarFeedback(d); });
+        socket.on('feedback_respondido', d => { if (window.notificarResposta) window.notificarResposta(d); });
 
         function atualizarListaConversas(msg) {
             const lista = document.querySelector('.lista-conversas');
@@ -365,6 +367,276 @@ document.addEventListener('DOMContentLoaded', function () {
             if (aviso) aviso.textContent = qtd ? '' : 'Este curso ainda não tem disciplinas.';
         });
     });
+    
+    // ── 9. Contador de caracteres do feedback ──────────────────
+    const textoFeedback = document.getElementById('texto-feedback');
+    const contadorFeedback = document.getElementById('contador-feedback');
+    if (textoFeedback && contadorFeedback) {
+        textoFeedback.addEventListener('input', function () {
+            contadorFeedback.textContent = this.value.length;
+        });
+    }
+
+    // ── 10. Feedbacks do professor ─────────────────────────────
+    const btnNotif = document.getElementById('btn-notificacao');
+    const dialogFb = document.getElementById('dialog-feedbacks');
+    const btnVoltar = document.getElementById('voltar-feedbacks');
+
+    function el(tag, classe, texto) {
+        const n = document.createElement(tag);
+        if (classe) n.className = classe;
+        if (texto !== undefined) n.textContent = texto;
+        return n;
+    }
+
+    if (btnNotif && dialogFb) {
+        const badge   = document.getElementById('badge-feedback');
+        const titulo  = document.getElementById('titulo-feedbacks');
+        const lista   = document.getElementById('lista-feedbacks');
+        const detalhe = document.getElementById('detalhe-feedback');
+
+        let novos = 0;                              // feedbacks ainda não lidos
+        let atual = { feedbacks: [], vazio: '' };   // lista que está na tela
+
+        // textContent em vez de innerHTML: o texto do aluno nunca vira HTML
+
+        function definirNovos(n) {
+            novos = Math.max(0, n);
+            badge.textContent = novos > 99 ? '99+' : novos;
+            badge.hidden = novos === 0;
+        }
+
+        function mostrarLista() {
+            detalhe.hidden = true;
+            lista.hidden = false;
+            btnVoltar.hidden = true;
+            lista.replaceChildren();
+
+            if (!atual.feedbacks.length) {
+                lista.appendChild(el('p', 'vazio-fb', atual.vazio));
+                return;
+            }
+            atual.feedbacks.forEach(function (f) {
+                const item = el('button', 'item-feedback' + (f.lido ? '' : ' nao-lido'));
+                item.type = 'button';
+                item.append(
+                    el('strong', '', f.topico),
+                    el('span', '', f.resumo),
+                    el('small', '', (f.autor || 'Anônimo') + ' · ' + f.data + (f.resposta ? ' · Respondido' : ''))
+                );
+                item.addEventListener('click', () => mostrarMensagem(f));
+                lista.appendChild(item);
+            });
+        }
+
+        function mostrarMensagem(f) {
+            lista.hidden = true;
+            detalhe.hidden = false;
+            btnVoltar.hidden = false;
+            detalhe.replaceChildren(
+                el('h3', '', f.topico),
+                el('p', 'meta-fb', (f.autor || 'Anônimo') + ' · ' + f.periodo + ' · ' + f.data),
+                el('p', 'texto-fb', f.texto),
+                blocoResposta(f)
+            );
+
+            if (!f.lido) {                          // abrir a mensagem marca como lida
+                f.lido = true;
+                definirNovos(novos - 1);
+                fetch('/api/feedbacks/' + f.id + '/lido', { method: 'POST' }).catch(() => {});
+            }
+        }
+
+        function abrirPainel(url, tituloTexto, vazio) {
+            titulo.textContent = tituloTexto;
+            atual = { feedbacks: [], vazio: vazio };
+            detalhe.hidden = true;
+            btnVoltar.hidden = true;
+            lista.hidden = false;
+            lista.replaceChildren(el('p', 'vazio-fb', 'Carregando…'));
+            if (!dialogFb.open) dialogFb.showModal();
+
+            fetch(url)
+                .then(r => r.json())
+                .then(function (d) { atual.feedbacks = d.feedbacks; mostrarLista(); })
+                .catch(() => lista.replaceChildren(el('p', 'vazio-fb', 'Não foi possível carregar.')));
+        }
+
+        function blocoResposta(f) {
+            const caixa = el('div', 'bloco-resposta');
+
+            if (f.resposta) {                         // já respondido: só mostra
+                caixa.append(
+                    el('h3', '', 'Sua resposta'),
+                    el('p', 'meta-fb', f.respondido_em),
+                    el('p', 'texto-fb resposta-fb', f.resposta)
+                );
+                return caixa;
+            }
+
+            const campo = el('textarea');
+            campo.rows = 4;
+            campo.maxLength = 2000;
+            campo.placeholder = 'Escreva sua resposta ao aluno…';
+
+            const erro = el('p', 'erro-fb');
+            const enviar = el('button', 'btn-responder', 'Responder');
+            enviar.type = 'button';
+
+            enviar.addEventListener('click', function () {
+                enviar.disabled = true;
+                fetch('/api/feedbacks/' + f.id + '/responder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ texto: campo.value })
+                })
+                    .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+                    .then(function (res) {
+                        if (!res.ok) {
+                            erro.textContent = res.d.erro || 'Erro ao responder.';
+                            enviar.disabled = false;
+                            return;
+                        }
+                        f.resposta = res.d.resposta;
+                        f.respondido_em = res.d.respondido_em;
+                        mostrarMensagem(f);           // redesenha já mostrando a resposta
+                    })
+                    .catch(function () {
+                        erro.textContent = 'Erro de conexão. Tente novamente.';
+                        enviar.disabled = false;
+                    });
+            });
+
+            caixa.append(el('h3', '', 'Responder ao aluno'), campo, erro, enviar);
+            return caixa;
+        }
+
+        btnVoltar.addEventListener('click', mostrarLista);
+
+        // 🔔 → feedbacks novos
+        btnNotif.addEventListener('click', () =>
+            abrirPainel('/api/feedbacks?novos=1', 'Novos feedbacks', 'Nenhum feedback novo.'));
+
+        // clicar numa disciplina → todos os feedbacks dela
+        document.querySelectorAll('.card-disciplina[data-id-disciplina]').forEach(function (card) {
+            card.addEventListener('click', () =>
+                abrirPainel('/api/feedbacks?disciplina=' + card.dataset.idDisciplina,
+                            'Feedbacks · ' + card.dataset.nome,
+                            'Esta disciplina ainda não recebeu feedback.'));
+        });
+
+        // aviso em tempo real (chamado pelo socket, ver seção 6)
+        window.notificarFeedback = function (d) {
+            definirNovos(novos + 1);
+            document.querySelectorAll('.toast-feedback').forEach(t => t.remove());
+            const toast = el('button', 'toast-feedback',
+                             'Novo feedback em ' + d.disciplina + ' (' + d.topico + ')');
+            toast.type = 'button';
+            toast.addEventListener('click', function () { toast.remove(); btnNotif.click(); });
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 8000);
+        };
+
+        // conta os não lidos ao carregar a página
+        fetch('/api/feedbacks?novos=1')
+            .then(r => r.json())
+            .then(d => definirNovos(d.feedbacks.length))
+            .catch(() => {});
+    }
+    
+    // ── 11. Meus feedbacks (aluno) ─────────────────────────────
+    const listaMeus = document.getElementById('lista-meus-feedbacks');
+    const dialogMeu = document.getElementById('dialog-meu-feedback');
+
+    if (listaMeus && dialogMeu) {
+        const detalheMeu = document.getElementById('detalhe-meu-feedback');
+        const tituloMeu  = document.getElementById('titulo-meu-feedback');
+        const badgeResp  = document.getElementById('badge-respostas');
+        const abaFeedbacks = document.querySelector('.btn-nav[data-secao="feedbacks"]');
+
+        let meus = [];
+
+        function atualizarBadge() {
+            const n = meus.filter(f => f.resposta_nova).length;
+            badgeResp.textContent = n > 99 ? '99+' : n;
+            badgeResp.hidden = n === 0;
+        }
+
+        function mostrarMeus() {
+            listaMeus.replaceChildren();
+            if (!meus.length) {
+                listaMeus.appendChild(el('p', 'vazio', 'Você ainda não enviou nenhum feedback.'));
+                atualizarBadge();
+                return;
+            }
+            meus.forEach(function (f) {
+                const item = el('button', 'item-feedback' + (f.resposta_nova ? ' nao-lido' : ''));
+                item.type = 'button';
+                const status = f.resposta
+                    ? (f.resposta_nova ? 'Resposta nova' : 'Respondido')
+                    : 'Aguardando resposta';
+                item.append(
+                    el('strong', '', f.topico + ' · ' + f.disciplina),
+                    el('span', '', f.resumo),
+                    el('small', '', status + ' · ' + f.data)
+                );
+                item.addEventListener('click', () => abrirMeu(f));
+                listaMeus.appendChild(item);
+            });
+            atualizarBadge();
+        }
+
+        function abrirMeu(f) {
+            tituloMeu.textContent = f.topico + ' · ' + f.disciplina;
+
+            const partes = [
+                el('p', 'meta-fb', f.periodo + ' · ' + f.data + ' · ' +
+                    (f.anonimo ? 'Enviado como anônimo' : 'Enviado identificado')),
+                el('p', 'texto-fb', f.texto)
+            ];
+            if (f.resposta) {
+                partes.push(
+                    el('h3', '', 'Resposta do professor'),
+                    el('p', 'meta-fb', f.respondido_em),
+                    el('p', 'texto-fb resposta-fb', f.resposta)
+                );
+            } else {
+                partes.push(el('p', 'meta-fb', 'Ainda sem resposta do professor.'));
+            }
+            detalheMeu.replaceChildren(...partes);
+            dialogMeu.showModal();
+
+            if (f.resposta_nova) {                  // abrir a resposta marca como vista
+                f.resposta_nova = false;
+                mostrarMeus();
+                fetch('/api/meus-feedbacks/' + f.id + '/lido', { method: 'POST' }).catch(() => {});
+            }
+        }
+
+        function carregarMeus() {
+            return fetch('/api/meus-feedbacks')
+                .then(r => r.json())
+                .then(function (d) { meus = d.feedbacks; mostrarMeus(); })
+                .catch(() => {});
+        }
+
+        // aviso em tempo real (chamado pelo socket, ver seção 6)
+        window.notificarResposta = function (d) {
+            carregarMeus();
+            document.querySelectorAll('.toast-feedback').forEach(t => t.remove());
+            const toast = el('button', 'toast-feedback',
+                             'O professor respondeu seu feedback em ' + d.disciplina);
+            toast.type = 'button';
+            toast.addEventListener('click', function () {
+                toast.remove();
+                if (abaFeedbacks) abaFeedbacks.click();
+            });
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 8000);
+        };
+
+        carregarMeus();
+    }
 });
 
 function desenharRosca(el, fatias, rotulo) {

@@ -44,6 +44,9 @@ a { text-decoration: none; }
     text-align: center;
 }
 
+/* espaço entre a mensagem flash e o conteúdo, nas áreas do aluno e do professor */
+.conteudo-aluno > .alert { margin-bottom: 16px; }
+
 /* .alert (painel ADM) */
 .alert {
     padding: 10px 16px;
@@ -427,18 +430,19 @@ main {
     color: #b35900;
     margin-bottom: 20px;
 }
-.btn-voltar {
-    display: inline-block;
-    margin-top: 28px;
-    padding: 10px 22px;
-    background: var(--verde);
-    color: var(--branco);
-    border-radius: 20px;
-    font-size: 14px;
-    font-weight: 600;
-    transition: background .2s;
+.btn-voltar-fb {
+    align-self: flex-start;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--creme);
+    font: inherit;
+    font-size: 13px;
+    opacity: .75;
+    cursor: pointer;
+    transition: opacity .2s, color .2s;
 }
-.btn-voltar:hover { background: var(--laranja); }
+.btn-voltar-fb:hover { opacity: 1; color: var(--laranja); }
 
 /* ─── Chat ───────────────────────────────────────────────────── */
 .chat-overlay {
@@ -805,3 +809,342 @@ main {
 }
 
 .grafico-wrap { position: relative; height: 340px; }
+
+/* ─── Feedback do aluno ──────────────────────────────────────── */
+.btn-feedback {
+    padding: 12px 28px;
+    background: var(--laranja);
+    color: var(--branco);
+    border: none;
+    border-radius: 50px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255, 153, 0, .45);
+    transition: transform .1s, opacity .2s;
+}
+.btn-feedback:hover { opacity: .9; transform: scale(1.03); }
+
+.dialog-feedback {
+    margin: auto;
+    width: min(92vw, 520px);
+    padding: 24px 28px;
+    border: none;
+    border-radius: var(--radius);
+    background: var(--verde);
+    box-shadow: var(--sombra);
+}
+.dialog-feedback::backdrop { background: rgba(0, 0, 0, .35); }
+
+.dialog-feedback form { display: flex; flex-direction: column; gap: 14px; }
+.dialog-feedback h2 { color: var(--laranja); font-size: 18px; }
+
+.dialog-feedback select,
+.dialog-feedback textarea {
+    width: 100%;
+    padding: 11px 16px;
+    border: 2px solid transparent;
+    border-radius: var(--radius);
+    background: var(--creme);
+    color: var(--texto);
+    font: inherit;
+    font-size: 14px;
+}
+.dialog-feedback textarea { min-height: 120px; resize: vertical; }
+.dialog-feedback select:focus,
+.dialog-feedback textarea:focus { outline: none; border-color: var(--laranja); }
+
+.contador { align-self: flex-end; color: var(--creme); font-weight: 400; }
+
+.dialog-acoes { display: flex; gap: 10px; }
+.dialog-acoes button {
+    padding: 10px 24px;
+    background: var(--creme);
+    color: var(--verde);
+    border: none;
+    border-radius: 50px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s;
+}
+.dialog-acoes button:hover { background: var(--laranja); color: var(--branco); }
+
+/* Interruptor de anonimato */
+.interruptor {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 12px 16px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .08);
+    color: var(--branco);
+    cursor: pointer;
+    transition: background .2s;
+}
+.interruptor:hover { background: rgba(255, 255, 255, .14); }
+
+.interruptor-info { display: flex; flex-direction: column; gap: 2px; }
+.interruptor-info strong { font-size: 14px; }
+.interruptor-info small { color: var(--creme); font-size: 12px; opacity: .85; }
+.interruptor input { position: absolute; opacity: 0; }
+
+.trilho {
+    position: relative;
+    flex-shrink: 0;
+    width: 46px;
+    height: 26px;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, .3);
+    transition: background .2s;
+}
+.trilho::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--branco);
+    transition: transform .2s;
+}
+.interruptor input:checked + .trilho { background: var(--laranja); }
+.interruptor input:checked + .trilho::after { transform: translateX(20px); }
+.interruptor input:focus-visible + .trilho { outline: 2px solid var(--branco); outline-offset: 2px; }
+
+.dica-anonimato { margin-top: -6px; color: var(--creme); font-size: 12px; }
+
+/* Faixa de destaque no topo da área do aluno */
+.faixa-feedback {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 26px;
+    padding: 18px 24px;
+    background: var(--creme);
+    border-left: 6px solid var(--laranja);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    box-shadow: var(--sombra);
+}
+.faixa-feedback div { display: flex; flex-direction: column; gap: 2px; }
+.faixa-feedback strong { color: var(--verde); font-size: 17px; }
+.faixa-feedback span { color: #555; font-size: 14px; }
+
+/* Escolha anônimo / identificado (dois botões no modal) */
+.opcoes-anonimato {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+    border: none;
+}
+.opcoes-anonimato legend {
+    margin-bottom: 8px;
+    color: var(--branco);
+    font-size: 14px;
+    font-weight: 600;
+}
+.opcao { position: relative; flex: 1; cursor: pointer; }
+.opcao input { position: absolute; opacity: 0; }
+.opcao span {
+    display: block;
+    padding: 10px;
+    border: 2px solid var(--creme);
+    border-radius: 50px;
+    color: var(--creme);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    transition: all .2s;
+}
+.opcao input:checked + span {
+    background: var(--laranja);
+    border-color: var(--laranja);
+    color: var(--branco);
+}
+.opcao input:focus-visible + span { outline: 2px solid var(--branco); outline-offset: 2px; }
+.opcoes-anonimato small { flex-basis: 100%; color: var(--creme); font-size: 12px; }
+
+/* ─── Feedbacks no painel do professor ───────────────────────── */
+.btn-notificacao {
+    position: relative;
+    padding: 6px 10px;
+    background: transparent;
+    border: 2px solid var(--creme);
+    border-radius: 50px;
+    color: var(--creme);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all .2s;
+}
+.btn-notificacao:hover {
+    background: var(--laranja);
+    border-color: var(--laranja);
+    color: var(--branco);
+}
+.badge-notificacao {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: var(--erro);
+    color: var(--branco);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+}
+
+.toast-feedback {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 2000;
+    max-width: 320px;
+    padding: 14px 20px;
+    border: none;
+    border-left: 6px solid var(--laranja);
+    border-radius: 12px;
+    background: var(--verde);
+    color: var(--branco);
+    box-shadow: var(--sombra);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+.card-disciplina[data-id-disciplina] { cursor: pointer; }
+
+.dialog-largo { width: min(92vw, 640px); max-height: 85vh; overflow-y: auto; }
+.dialog-topo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.dialog-topo h2 { flex: 1; }
+
+.dialog-fechar,
+.dialog-voltar {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .15);
+    color: var(--branco);
+    cursor: pointer;
+}
+.dialog-fechar:hover,
+.dialog-voltar:hover { background: rgba(255, 255, 255, .3); }
+
+.lista-feedbacks { display: flex; flex-direction: column; gap: 10px; }
+.item-feedback {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 16px;
+    border: none;
+    border-left: 5px solid transparent;
+    border-radius: 0 12px 12px 0;
+    background: var(--creme);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background .2s;
+}
+.item-feedback:hover { background: var(--cinza); }
+.item-feedback.nao-lido { border-left-color: var(--laranja); }
+.item-feedback strong { color: var(--verde); font-size: 14px; }
+.item-feedback span {
+    color: #444;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.item-feedback small { color: #888; font-size: 12px; }
+
+.vazio-fb { color: var(--creme); font-size: 14px; font-style: italic; }
+
+.detalhe-feedback { display: flex; flex-direction: column; gap: 10px; color: var(--branco); }
+.detalhe-feedback h3 { color: var(--laranja); font-size: 16px; }
+.meta-fb { color: var(--creme); font-size: 12px; }
+.texto-fb {
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--creme);
+    color: var(--texto);
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.btn-voltar-fb {
+    align-self: flex-start;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 50px;
+    background: var(--creme);
+    color: var(--verde);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-voltar-fb:hover { background: var(--laranja); color: var(--branco); }
+
+/* o display:flex acima vence o atributo hidden; esta regra o restaura */
+.lista-feedbacks[hidden],
+.detalhe-feedback[hidden] { display: none; }
+
+/* ─── Resposta ao feedback ───────────────────────────────────── */
+.bloco-resposta { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.bloco-resposta h3 { color: var(--laranja); font-size: 16px; }
+
+.btn-responder {
+    align-self: flex-start;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 50px;
+    background: var(--laranja);
+    color: var(--branco);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .2s;
+}
+.btn-responder:hover { opacity: .85; }
+.btn-responder:disabled { opacity: .5; cursor: not-allowed; }
+
+.erro-fb { color: #ffaaaa; font-size: 13px; }
+.erro-fb:empty { display: none; }
+
+.texto-fb.resposta-fb { border-left: 6px solid var(--laranja); }
+
+/* contador de respostas novas na aba do aluno */
+.badge-aba {
+    display: inline-block;
+    min-width: 18px;
+    margin-left: 6px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--erro);
+    color: var(--branco);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+.badge-aba[hidden] { display: none; }
