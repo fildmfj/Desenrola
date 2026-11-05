@@ -389,6 +389,19 @@ document.addEventListener('DOMContentLoaded', function () {
         return n;
     }
 
+    // GET sem corpo, POST com corpo. Lança Error com a mensagem do servidor.
+    function api(url, corpo) {
+        const opcoes = corpo === undefined ? {} : {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corpo)
+        };
+        return fetch(url, opcoes).then(r => r.json().then(function (d) {
+            if (!r.ok) throw new Error(d.erro || 'Erro inesperado.');
+            return d;
+        }));
+    }
+
     if (btnNotif && dialogFb) {
         const badge   = document.getElementById('badge-feedback');
         const titulo  = document.getElementById('titulo-feedbacks');
@@ -518,12 +531,11 @@ document.addEventListener('DOMContentLoaded', function () {
             abrirPainel('/api/feedbacks?novos=1', 'Novos feedbacks', 'Nenhum feedback novo.'));
 
         // clicar numa disciplina → todos os feedbacks dela
-        document.querySelectorAll('.card-disciplina[data-id-disciplina]').forEach(function (card) {
-            card.addEventListener('click', () =>
-                abrirPainel('/api/feedbacks?disciplina=' + card.dataset.idDisciplina,
-                            'Feedbacks · ' + card.dataset.nome,
-                            'Esta disciplina ainda não recebeu feedback.'));
-        });
+        // usado pela página da disciplina (seção 12): feedbacks daquela turma
+        window.abrirFeedbacksTurma = function (id, nome) {
+            abrirPainel('/api/feedbacks?turma=' + id, 'Feedbacks · ' + nome,
+                        'Esta disciplina ainda não recebeu feedback.');
+        };
 
         // aviso em tempo real (chamado pelo socket, ver seção 6)
         window.notificarFeedback = function (d) {
@@ -552,9 +564,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const detalheMeu = document.getElementById('detalhe-meu-feedback');
         const tituloMeu  = document.getElementById('titulo-meu-feedback');
         const badgeResp  = document.getElementById('badge-respostas');
-        const abaFeedbacks = document.querySelector('.btn-nav[data-secao="feedbacks"]');
+        const abaFeedbacks = document.querySelector('.btn-nav[data-secao="forum"]');
 
         let meus = [];
+        let turmaFiltro = null;                        // disciplina aberta na página do fórum
+        window.definirTurmaFeedbacks = function (id) { turmaFiltro = id; mostrarMeus(); };
 
         function atualizarBadge() {
             const n = meus.filter(f => f.resposta_nova).length;
@@ -563,13 +577,14 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         function mostrarMeus() {
+            const visiveis = meus.filter(f => f.turma === turmaFiltro);
             listaMeus.replaceChildren();
-            if (!meus.length) {
-                listaMeus.appendChild(el('p', 'vazio', 'Você ainda não enviou nenhum feedback.'));
+            if (!visiveis.length) {
+                listaMeus.appendChild(el('p', 'vazio', 'Você ainda não enviou feedback para esta disciplina.'));
                 atualizarBadge();
                 return;
             }
-            meus.forEach(function (f) {
+            visiveis.forEach(function (f) {
                 const item = el('button', 'item-feedback' + (f.resposta_nova ? ' nao-lido' : ''));
                 item.type = 'button';
                 const status = f.resposta
@@ -636,6 +651,221 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         carregarMeus();
+    }
+
+        // ── 12. Fórum da disciplina (aluno) ────────────────────────
+    const secaoTurma = document.getElementById('secao-turma');
+
+    if (secaoTurma) {
+        const secaoForum   = document.getElementById('secao-forum') || document.getElementById('secao-disciplinas');
+        const tituloTurma  = document.getElementById('titulo-turma');
+        const feed         = document.getElementById('feed-posts');
+        const dialogPost   = document.getElementById('dialog-post-novo');
+        const formPost     = document.getElementById('form-post');
+        const erroPost     = document.getElementById('erro-post');
+        const secaoPost    = document.getElementById('secao-post');
+        const thread       = document.getElementById('thread');
+
+        let turma = null;                               // { id, nome } da disciplina aberta
+
+        const nomeAutor = x => (x.autor_tipo === 'professor' ? 'Prof. ' : '') + x.autor;
+
+        function mostrarSecao(secao) {
+            document.querySelectorAll('.secao').forEach(s => s.classList.remove('ativo'));
+            secao.classList.add('ativo');
+        }
+
+        function trocarSub(nome) {
+            document.querySelectorAll('.subaba').forEach(b =>
+                b.classList.toggle('ativo', b.dataset.sub === nome));
+            document.getElementById('sub-posts').hidden = nome !== 'posts';
+            document.getElementById('sub-feedbacks').hidden = nome !== 'feedbacks';
+        }
+
+        // ▲ de post ou de resposta (clicar de novo tira o voto)
+        function botaoVoto(alvo, id, votos, votei) {
+            const b = el('button', 'btn-voto' + (votei ? ' votado' : ''), '▲ ' + votos);
+            b.type = 'button';
+            b.addEventListener('click', function (e) {
+                e.stopPropagation();
+                api('/api/voto', { alvo: alvo, id: id }).then(function (r) {
+                    b.textContent = '▲ ' + r.votos;
+                    b.classList.toggle('votado', r.votei);
+                }).catch(() => {});
+            });
+            return b;
+        }
+
+        // ── feed ──
+        function topoPost(p) {
+            const autor = el('div', 'post-autor');
+            autor.append(el('strong', '', nomeAutor(p)), el('small', '', p.data));
+
+            const topo = el('div', 'post-topo');
+            topo.append(el('div', 'avatar-mini', p.autor[0].toUpperCase()), autor,
+                        el('span', 'chip', p.tipo));
+            return topo;
+        }
+
+        function rodapePost(p) {
+            const rodape = el('div', 'post-rodape');
+            rodape.append(botaoVoto('post', p.id, p.votos, p.votei),
+                          el('span', '', '💬 ' + p.respostas));
+            if (p.resolvido) rodape.append(el('span', 'selo-resolvido', '✔ Resolvido'));
+            return rodape;
+        }
+
+        function cartaoPost(p) {
+            const cartao = el('article', 'post' + (p.resolvido ? ' resolvido' : ''));
+            cartao.append(topoPost(p), el('h3', '', p.titulo), el('p', '', p.resumo), rodapePost(p));
+            cartao.addEventListener('click', () => abrirThread(p.id).then(() => window.scrollTo(0, 0)));
+            return cartao;
+        }
+
+        function carregarPosts() {
+            feed.replaceChildren(el('p', 'vazio', 'Carregando…'));
+            api('/api/turma/' + turma.id + '/posts')
+                .then(function (d) {
+                    feed.replaceChildren();
+                    if (!d.posts.length) {
+                        feed.appendChild(el('p', 'vazio',
+                            'Ainda não há publicações. Seja o primeiro a perguntar!'));
+                        return;
+                    }
+                    d.posts.forEach(p => feed.appendChild(cartaoPost(p)));
+                })
+                .catch(() => feed.replaceChildren(el('p', 'vazio', 'Não foi possível carregar.')));
+        }
+
+        // ── publicação aberta (pergunta + respostas) ──
+        function cartaoResposta(r, d, p) {
+            const meta = el('div', 'meta', nomeAutor(r) + ' · ' + r.data +
+                                           (r.aceita ? ' · ✔ Melhor resposta' : ''));
+            const acoes = el('div', 'resposta-acoes');
+            acoes.append(botaoVoto('resposta', r.id, r.votos, r.votei));
+
+            if (d.pode_aceitar && !r.aceita) {
+                const b = el('button', 'btn-aceitar', '✔ Melhor resposta');
+                b.type = 'button';
+                b.addEventListener('click', () =>
+                    api('/api/respostas/' + r.id + '/aceitar', {})
+                        .then(() => abrirThread(p.id))
+                        .catch(() => {}));
+                acoes.append(b);
+            }
+
+            const cartao = el('div', 'resposta-card' + (r.aceita ? ' aceita' : ''));
+            cartao.append(meta, el('p', '', r.texto), acoes);
+            return cartao;
+        }
+
+        function formResposta(p) {
+            const campo = el('textarea');
+            campo.rows = 3;
+            campo.maxLength = 2000;
+            campo.placeholder = 'Escreva sua resposta…';
+
+            const erro = el('p', 'erro-fb');
+            const enviar = el('button', 'btn-responder', 'Responder');
+            enviar.type = 'button';
+            enviar.addEventListener('click', function () {
+                enviar.disabled = true;
+                api('/api/posts/' + p.id + '/respostas', { texto: campo.value })
+                    .then(() => abrirThread(p.id))
+                    .catch(function (err) {
+                        erro.textContent = err.message;
+                        enviar.disabled = false;
+                    });
+            });
+
+            const caixa = el('div', 'nova-resposta');
+            caixa.append(el('h3', '', 'Sua resposta'), campo, erro, enviar);
+            return caixa;
+        }
+
+        function desenharThread(d) {
+            const p = d.post;
+
+            const aberto = el('div', 'post-aberto' + (p.resolvido ? ' resolvido' : ''));
+            aberto.append(topoPost(p), el('h3', '', p.titulo), el('p', 'corpo', p.texto), rodapePost(p));
+
+            const respostas = el('div', 'respostas');
+            d.respostas.forEach(r => respostas.appendChild(cartaoResposta(r, d, p)));
+
+            const n = d.respostas.length;
+            const tituloRespostas = n === 0 ? 'Nenhuma resposta ainda'
+                                  : n === 1 ? '1 resposta'
+                                  : n + ' respostas';
+
+            thread.replaceChildren(
+                aberto,
+                el('h3', 'thread-respostas-titulo', tituloRespostas),
+                respostas,
+                formResposta(p)
+            );
+        }
+
+        function abrirThread(id) {
+            return api('/api/posts/' + id)
+                .then(function (d) {
+                    desenharThread(d);
+                    mostrarSecao(secaoPost);
+                })
+                .catch(() => {});
+        }
+
+        // ── navegação: disciplinas → página da disciplina ──
+        function abrirTurma(id, nome) {
+            turma = { id: Number(id), nome: nome };
+            tituloTurma.textContent = nome;
+            mostrarSecao(secaoTurma);
+            trocarSub('posts');
+            if (window.definirTurmaFeedbacks) window.definirTurmaFeedbacks(turma.id);
+            carregarPosts();
+        }
+
+        document.getElementById('voltar-turma').addEventListener('click', function () {
+            mostrarSecao(secaoTurma);
+            carregarPosts();
+        });
+        document.querySelectorAll('.card-disciplina[data-turma]').forEach(card =>
+            card.addEventListener('click', () => abrirTurma(card.dataset.turma, card.dataset.nome)));
+        document.getElementById('voltar-forum').addEventListener('click', () => mostrarSecao(secaoForum));
+        document.querySelectorAll('.subaba').forEach(b =>
+            b.addEventListener('click', () => trocarSub(b.dataset.sub)));
+
+        // ── botões da página da disciplina ──
+        document.getElementById('btn-nova-publicacao').addEventListener('click', () => dialogPost.showModal());
+
+        const btnFeedback = document.getElementById('btn-abrir-feedback');          // aluno
+        if (btnFeedback) {
+            btnFeedback.addEventListener('click', function () {
+                const dialogFeedback = document.getElementById('dialog-feedback');
+                dialogFeedback.querySelector('select[name="disciplina"]').value = turma.id;
+                dialogFeedback.showModal();
+            });
+        }
+
+        const btnVerFeedbacks = document.getElementById('btn-feedbacks-turma');     // professor
+        if (btnVerFeedbacks) {
+            btnVerFeedbacks.addEventListener('click', () =>
+                window.abrirFeedbacksTurma(turma.id, turma.nome));
+        }
+
+        // ── formulário de nova publicação ──
+        formPost.addEventListener('submit', function (e) {
+            e.preventDefault();
+            const f = new FormData(formPost);
+            api('/api/turma/' + turma.id + '/posts',
+                { tipo: f.get('tipo'), titulo: f.get('titulo'), texto: f.get('texto') })
+                .then(function () {
+                    formPost.reset();
+                    erroPost.textContent = '';
+                    dialogPost.close();
+                    carregarPosts();
+                })
+                .catch(err => { erroPost.textContent = err.message; });
+        });
     }
 });
 

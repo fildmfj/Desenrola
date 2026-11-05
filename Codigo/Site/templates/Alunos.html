@@ -12,10 +12,9 @@
             <img src="{{ url_for('static', filename='imagens/Desenrola.png') }}" alt="Logo Desenrola">
         </div>
         <nav class="nav-aluno">
-            <button class="btn-nav ativo" data-secao="disciplinas">Minhas Disciplinas</button>
+            <button class="btn-nav ativo" data-secao="forum">Disciplinas<span class="badge-aba" id="badge-respostas" hidden>0</span></button>
             <button class="btn-nav" data-secao="professores">Meus Professores</button>
             <button class="btn-nav" data-secao="conversas">Minhas Conversas</button>
-            <button class="btn-nav" data-secao="feedbacks">Meus Feedbacks <span class="badge-aba" id="badge-respostas" hidden>0</span></button>
         </nav>
         <div class="usuario-info">
             <span>Olá, {{ session.nome }}</span>
@@ -27,25 +26,13 @@
         {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
             <div class="alert alert-{{ categoria }}">{{ mensagem }}</div>
         {% endfor %}
-        {% if disciplinas %}
-            <div class="faixa-feedback">
-                <div>
-                    <strong>Sua opinião importa!</strong>
-                    <span>Conte como estão o professor, as aulas, o plano de ensino e as disciplinas.</span>
-                </div>
-                <button type="button" class="btn-feedback"
-                        onclick="document.getElementById('dialog-feedback').showModal()">
-                    Enviar feedback
-                </button>
-            </div>
-        {% endif %}
-        <!-- Disciplinas -->
-        <section id="secao-disciplinas" class="secao ativo">
+        <!-- Fórum: escolha da disciplina -->
+        <section id="secao-forum" class="secao ativo">
             <h2>Minhas Disciplinas</h2>
             {% if disciplinas %}
                 <div class="grade-cards">
                     {% for d in disciplinas %}
-                    <div class="card-disciplina">
+                    <div class="card-disciplina" data-turma="{{ d.id_disciplina_periodo }}" data-nome="{{ d.nome }}">
                         <span class="codigo-disciplina">{{ d.codigo }}</span>
                         <h3>{{ d.nome }}</h3>
                         <p>Prof. {{ d.professor_nome or 'Não atribuído' }}</p>
@@ -55,6 +42,33 @@
             {% else %}
                 <p class="vazio">Nenhuma disciplina matriculada ainda.</p>
             {% endif %}
+        </section>
+
+        <!-- Fórum: página da disciplina (abre ao clicar num card) -->
+        <section id="secao-turma" class="secao">
+            <button type="button" class="link-voltar" id="voltar-forum">← Disciplinas</button>
+            <h2 id="titulo-turma"></h2>
+
+            <div class="subabas">
+                <button type="button" class="subaba ativo" data-sub="posts">Publicações</button>
+                <button type="button" class="subaba" data-sub="feedbacks">Feedback</button>
+            </div>
+
+            <div id="sub-posts">
+                <button type="button" class="btn-feedback" id="btn-nova-publicacao">Nova publicação</button>
+                <div id="feed-posts" class="feed"></div>
+            </div>
+
+            <div id="sub-feedbacks" hidden>
+                <button type="button" class="btn-feedback" id="btn-abrir-feedback">Enviar feedback</button>
+                <div id="lista-meus-feedbacks" class="lista-feedbacks"></div>
+            </div>
+        </section>
+        
+        <!-- Fórum: publicação aberta (pergunta no topo, respostas abaixo) -->
+        <section id="secao-post" class="secao">
+            <button type="button" class="link-voltar" id="voltar-turma">← Voltar para a disciplina</button>
+            <article id="thread" class="thread"></article>
         </section>
 
         <!-- Professores -->
@@ -94,12 +108,6 @@
                 <p class="vazio">Nenhuma conversa iniciada ainda.</p>
             {% endif %}
         </section>
-
-        <!-- Meus Feedbacks -->
-        <section id="secao-feedbacks" class="secao">
-            <h2>Meus Feedbacks</h2>
-            <div id="lista-meus-feedbacks" class="lista-feedbacks"></div>
-        </section>
     </main>
 
     <dialog id="dialog-meu-feedback" class="dialog-feedback dialog-largo">
@@ -108,6 +116,38 @@
             <button type="button" class="dialog-fechar" onclick="this.closest('dialog').close()">✕</button>
         </div>
         <article id="detalhe-meu-feedback" class="detalhe-feedback"></article>
+    </dialog>
+
+    <dialog id="dialog-post-novo" class="dialog-feedback">
+        <form id="form-post">
+            <h2>Nova publicação</h2>
+
+            <label class="campo">
+                Tipo:
+                <select name="tipo" required>
+                    {% for chave, nome in tipos_post.items() %}
+                        <option value="{{ chave }}">{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="campo">
+                Título:
+                <input type="text" name="titulo" maxlength="150" required>
+            </label>
+
+            <label class="campo">
+                Texto:
+                <textarea name="texto" rows="6" maxlength="2000" required></textarea>
+            </label>
+
+            <p class="erro-fb" id="erro-post"></p>
+
+            <div class="dialog-acoes">
+                <button type="submit">Publicar</button>
+                <button type="button" onclick="this.closest('dialog').close()">Cancelar</button>
+            </div>
+        </form>
     </dialog>
     
     <dialog id="dialog-feedback" class="dialog-feedback">

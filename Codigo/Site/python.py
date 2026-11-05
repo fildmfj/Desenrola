@@ -796,7 +796,8 @@ def alunos():
                            disciplinas=lista_disciplinas,
                            professores=lista_professores,
                            conversas=conversas,
-                           topicos_feedback=TOPICOS_FEEDBACK)
+                           topicos_feedback=TOPICOS_FEEDBACK,
+                           tipos_post=TIPOS_POST)
 
 def meu_feedback_para_json(r):
     texto = r['texto']
@@ -812,6 +813,7 @@ def meu_feedback_para_json(r):
         'resposta': r['resposta'],
         'respondido_em': r['respondido_em'].strftime('%d/%m/%Y %H:%M') if r['respondido_em'] else None,
         'resposta_nova': bool(r['resposta']) and not r['resposta_lida'],
+        'turma': r['id_disciplina_periodo'],
     }
 
 
@@ -821,7 +823,7 @@ def api_meus_feedbacks():
     with db() as (conn, cursor):
         linhas = listar(cursor, '''
             SELECT f.id_feedback, f.topico, f.texto, f.criado_em, f.anonimo,
-                   f.resposta, f.respondido_em, f.resposta_lida,
+                   f.resposta, f.respondido_em, f.resposta_lida, f.id_disciplina_periodo,
                    d.nome AS disciplina, p.descricao AS periodo
             FROM feedback f
             JOIN disciplina_periodo dp ON dp.id_disciplina_periodo = f.id_disciplina_periodo
@@ -908,6 +910,11 @@ def api_feedbacks():
     """?novos=1 → só os não lidos | ?disciplina=<id> → todos daquela disciplina."""
     filtros = ['dp.id_professor = %s']
     params = [session['usuario_id']]
+
+    id_turma = request.args.get('turma', type=int)
+    if id_turma:
+        filtros.append('dp.id_disciplina_periodo = %s')
+        params.append(id_turma)
 
     if request.args.get('novos'):
         filtros.append('f.lido = FALSE')
@@ -1009,6 +1016,240 @@ def notificar_aluno_resposta(cursor, id_feedback):
         socketio.emit('feedback_respondido', {'disciplina': alvo['disciplina']},
                       to=f"usuario_{alvo['id_aluno']}")
 
+TIPOS_POST = {'duvida': 'Dúvida', 'curiosidade': 'Curiosidade', 'outro': 'Outro'}
+
+
+def erro_json(msg, status=400):
+    return {'erro': msg}, status
+
+
+def texto_valido(valor, limite):
+    """Texto sem espaços nas pontas, ou None se vazio / maior que o limite."""
+    texto = (valor or '').replace('\r\n', '\n').strip()
+    return texto if texto and len(texto) <= limite else None
+
+
+def pode_ver_turma(cursor, id_dp):
+    """Aluno matriculado na turma, ou professor dela."""
+    tipo = session.get('tipo')
+    if tipo == 'aluno':
+        sql = 'SELECT 1 FROM matricula_disciplina WHERE id_aluno = %s AND id_disciplina = %s'
+    elif tipo == 'professor':
+        sql = ('SELECT 1 FROM disciplina_periodo '
+               'WHERE id_professor = %s AND id_disciplina_periodo = %s')
+    else:
+        return False
+    cursor.execute(sql, (session['usuario_id'], id_dp))
+    return cursor.fetchone() is not None
+
+
+def buscar_posts(cursor, uid, onde, params):
+    # "onde" é sempre um texto fixo do código; só os valores entram como parâmetros
+    return listar(cursor, f'''
+        SELECT p.id_post, p.id_disciplina_periodo, p.id_autor, p.tipo, p.titulo, p.texto,
+               p.resolvido, p.criado_em, u.nome AS autor, u.tipo AS autor_tipo,
+               (SELECT COUNT(*) FROM forum_resposta r WHERE r.id_post = p.id_post) AS respostas,
+               (SELECT COUNT(*) FROM forum_voto v
+                 WHERE v.alvo = 'post' AND v.id_alvo = p.id_post) AS votos,
+               EXISTS (SELECT 1 FROM forum_voto v
+                 WHERE v.alvo = 'post' AND v.id_alvo = p.id_post
+                   AND v.id_usuario = %s) AS votei
+        FROM forum_post p
+        JOIN usuario u ON u.id_usuario = p.id_autor
+        WHERE {onde}
+        ORDER BY p.criado_em DESC
+        LIMIT 100
+    ''', (uid, *params))
+
+
+def post_para_json(r):
+    return {
+        'id': r['id_post'],
+        'tipo': TIPOS_POST.get(r['tipo'], r['tipo']),
+        'titulo': r['titulo'],
+        'texto': r['texto'],
+        'resumo': ' '.join(r['texto'].split())[:200],
+        'autor': r['autor'],
+        'autor_tipo': r['autor_tipo'],
+        'data': r['criado_em'].strftime('%d/%m/%Y %H:%M'),
+        'resolvido': bool(r['resolvido']),
+        'respostas': r['respostas'],
+        'votos': r['votos'],
+        'votei': bool(r['votei']),
+    }
+
+
+def resposta_para_json(r):
+    return {
+        'id': r['id_resposta'],
+        'texto': r['texto'],
+        'autor': r['autor'],
+        'autor_tipo': r['autor_tipo'],
+        'data': r['criado_em'].strftime('%d/%m/%Y %H:%M'),
+        'aceita': bool(r['aceita']),
+        'votos': r['votos'],
+        'votei': bool(r['votei']),
+    }
+
+
+@app.route('/api/turma/<int:id_dp>/posts')
+@acesso('aluno', 'professor')
+def api_forum_posts(id_dp):
+    uid = session['usuario_id']
+    with db() as (conn, cursor):
+        if not pode_ver_turma(cursor, id_dp):
+            return erro_json('Sem acesso a esta disciplina.', 403)
+        posts = buscar_posts(cursor, uid, 'p.id_disciplina_periodo = %s', (id_dp,))
+    return {'posts': [post_para_json(p) for p in posts]}
+
+
+@app.route('/api/turma/<int:id_dp>/posts', methods=['POST'])
+@acesso('aluno', 'professor')
+def api_forum_criar_post(id_dp):
+    dados = request.get_json(silent=True) or {}
+    tipo = dados.get('tipo', '')
+    titulo = texto_valido(dados.get('titulo'), 150)
+    texto = texto_valido(dados.get('texto'), 2000)
+
+    if tipo not in TIPOS_POST:
+        return erro_json('Escolha o tipo da publicação.')
+    if not titulo:
+        return erro_json('Escreva um título (até 150 caracteres).')
+    if not texto:
+        return erro_json('Escreva o texto (até 2000 caracteres).')
+
+    with db() as (conn, cursor):
+        if not pode_ver_turma(cursor, id_dp):
+            return erro_json('Sem acesso a esta disciplina.', 403)
+        cursor.execute(
+            'INSERT INTO forum_post (id_disciplina_periodo, id_autor, tipo, titulo, texto) '
+            'VALUES (%s, %s, %s, %s, %s)',
+            (id_dp, session['usuario_id'], tipo, titulo, texto)
+        )
+        conn.commit()
+    return {'ok': True}
+
+
+@app.route('/api/posts/<int:id_post>')
+@acesso('aluno', 'professor')
+def api_forum_post(id_post):
+    uid = session['usuario_id']
+    with db() as (conn, cursor):
+        posts = buscar_posts(cursor, uid, 'p.id_post = %s', (id_post,))
+        if not posts:
+            return erro_json('Publicação não encontrada.', 404)
+        post = posts[0]
+        if not pode_ver_turma(cursor, post['id_disciplina_periodo']):
+            return erro_json('Sem acesso a esta disciplina.', 403)
+
+        respostas = listar(cursor, '''
+            SELECT r.id_resposta, r.texto, r.aceita, r.criado_em,
+                   u.nome AS autor, u.tipo AS autor_tipo,
+                   (SELECT COUNT(*) FROM forum_voto v
+                     WHERE v.alvo = 'resposta' AND v.id_alvo = r.id_resposta) AS votos,
+                   EXISTS (SELECT 1 FROM forum_voto v
+                     WHERE v.alvo = 'resposta' AND v.id_alvo = r.id_resposta
+                       AND v.id_usuario = %s) AS votei
+            FROM forum_resposta r
+            JOIN usuario u ON u.id_usuario = r.id_autor
+            WHERE r.id_post = %s
+            ORDER BY r.aceita DESC, votos DESC, r.criado_em ASC
+        ''', (uid, id_post))
+
+    return {
+        'post': post_para_json(post),
+        'respostas': [resposta_para_json(r) for r in respostas],
+        # quem perguntou, ou o professor da turma, escolhe a melhor resposta
+        'pode_aceitar': post['id_autor'] == uid or session['tipo'] == 'professor',
+    }
+
+
+@app.route('/api/posts/<int:id_post>/respostas', methods=['POST'])
+@acesso('aluno', 'professor')
+def api_forum_responder(id_post):
+    texto = texto_valido((request.get_json(silent=True) or {}).get('texto'), 2000)
+    if not texto:
+        return erro_json('Escreva a resposta (até 2000 caracteres).')
+
+    with db() as (conn, cursor):
+        cursor.execute('SELECT id_disciplina_periodo FROM forum_post WHERE id_post = %s',
+                       (id_post,))
+        post = cursor.fetchone()
+        if not post:
+            return erro_json('Publicação não encontrada.', 404)
+        if not pode_ver_turma(cursor, post['id_disciplina_periodo']):
+            return erro_json('Sem acesso a esta disciplina.', 403)
+        cursor.execute(
+            'INSERT INTO forum_resposta (id_post, id_autor, texto) VALUES (%s, %s, %s)',
+            (id_post, session['usuario_id'], texto)
+        )
+        conn.commit()
+    return {'ok': True}
+
+
+@app.route('/api/voto', methods=['POST'])
+@acesso('aluno', 'professor')
+def api_forum_voto():
+    dados = request.get_json(silent=True) or {}
+    alvo, id_alvo = dados.get('alvo'), dados.get('id')
+    if alvo not in ('post', 'resposta') or not isinstance(id_alvo, int):
+        return erro_json('Voto inválido.')
+    uid = session['usuario_id']
+
+    with db() as (conn, cursor):
+        if alvo == 'post':
+            cursor.execute('SELECT id_disciplina_periodo FROM forum_post WHERE id_post = %s',
+                           (id_alvo,))
+        else:
+            cursor.execute('''
+                SELECT p.id_disciplina_periodo
+                FROM forum_resposta r JOIN forum_post p ON p.id_post = r.id_post
+                WHERE r.id_resposta = %s
+            ''', (id_alvo,))
+        turma = cursor.fetchone()
+        if not turma or not pode_ver_turma(cursor, turma['id_disciplina_periodo']):
+            return erro_json('Publicação não encontrada.', 404)
+
+        # clicar de novo tira o voto
+        cursor.execute(
+            'DELETE FROM forum_voto WHERE alvo = %s AND id_alvo = %s AND id_usuario = %s',
+            (alvo, id_alvo, uid))
+        votei = cursor.rowcount == 0
+        if votei:
+            cursor.execute(
+                'INSERT INTO forum_voto (alvo, id_alvo, id_usuario) VALUES (%s, %s, %s)',
+                (alvo, id_alvo, uid))
+        conn.commit()
+
+        cursor.execute('SELECT COUNT(*) AS n FROM forum_voto WHERE alvo = %s AND id_alvo = %s',
+                       (alvo, id_alvo))
+        votos = cursor.fetchone()['n']
+    return {'votos': votos, 'votei': votei}
+
+
+@app.route('/api/respostas/<int:id_resposta>/aceitar', methods=['POST'])
+@acesso('aluno', 'professor')
+def api_forum_aceitar(id_resposta):
+    uid = session['usuario_id']
+    with db() as (conn, cursor):
+        cursor.execute('''
+            SELECT r.id_post, p.id_autor, p.id_disciplina_periodo
+            FROM forum_resposta r JOIN forum_post p ON p.id_post = r.id_post
+            WHERE r.id_resposta = %s
+        ''', (id_resposta,))
+        r = cursor.fetchone()
+        if not r or not pode_ver_turma(cursor, r['id_disciplina_periodo']):
+            return erro_json('Resposta não encontrada.', 404)
+        if r['id_autor'] != uid and session['tipo'] != 'professor':
+            return erro_json('Só quem perguntou ou o professor escolhe a melhor resposta.', 403)
+
+        cursor.execute('UPDATE forum_resposta SET aceita = (id_resposta = %s) WHERE id_post = %s',
+                       (id_resposta, r['id_post']))
+        cursor.execute('UPDATE forum_post SET resolvido = TRUE WHERE id_post = %s',
+                       (r['id_post'],))
+        conn.commit()
+    return {'ok': True}
+
 @app.route('/professores')
 @acesso('professor')
 def professores():
@@ -1017,16 +1258,18 @@ def professores():
     with db() as (conn, cursor):
         # Disciplinas lecionadas pelo professor (com curso)
         lista_disciplinas = listar(cursor, '''
-            SELECT d.id_disciplina,
+            SELECT dp.id_disciplina_periodo,
                    d.nome,
                    d.codigo,
                    c.nome  AS curso_nome,
-                   c.sigla AS curso_sigla
-            FROM disciplina d
-            JOIN disciplina_periodo dp ON dp.id_disciplina = d.id_disciplina
+                   c.sigla AS curso_sigla,
+                   p.descricao AS periodo_descricao
+            FROM disciplina_periodo dp
+            JOIN disciplina d ON d.id_disciplina = dp.id_disciplina
             JOIN curso c ON c.id_curso = d.id_curso
+            JOIN periodo p ON p.id_periodo = dp.id_periodo
             WHERE dp.id_professor = %s
-            ORDER BY d.nome
+            ORDER BY d.nome, p.data_inicio DESC
         ''', (uid,))
 
         lista_alunos = listar(cursor, '''
@@ -1043,7 +1286,8 @@ def professores():
     return render_template('Professores.html',
                            disciplinas=lista_disciplinas,
                            alunos=lista_alunos,
-                           conversas=conversas)
+                           conversas=conversas,
+                           tipos_post=TIPOS_POST)
 
 
 @app.route('/termos')

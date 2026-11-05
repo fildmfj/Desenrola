@@ -31,10 +31,10 @@
             {% if disciplinas %}
                 <div class="grade-cards">
                     {% for d in disciplinas %}
-                    <div class="card-disciplina" data-id-disciplina="{{ d.id_disciplina }}" data-nome="{{ d.nome }}">
+                    <div class="card-disciplina" data-turma="{{ d.id_disciplina_periodo }}" data-nome="{{ d.nome }}">
                         <span class="codigo-disciplina">{{ d.codigo }}</span>
                         <h3>{{ d.nome }}</h3>
-                        <p>{{ d.curso_nome }}</p>
+                        <p>{{ d.curso_nome }} · {{ d.periodo_descricao }}</p>
                     </div>
                     {% endfor %}
                 </div>
@@ -78,6 +78,32 @@
                 <p class="vazio">Nenhuma conversa iniciada ainda.</p>
             {% endif %}
         </section>
+
+        <!-- Fórum: página da disciplina (abre ao clicar num card) -->
+        <section id="secao-turma" class="secao">
+            <button type="button" class="link-voltar" id="voltar-forum">← Disciplinas</button>
+            <h2 id="titulo-turma"></h2>
+
+            <div class="subabas">
+                <button type="button" class="subaba ativo" data-sub="posts">Publicações</button>
+                <button type="button" class="subaba" data-sub="feedbacks">Feedbacks</button>
+            </div>
+
+            <div id="sub-posts">
+                <button type="button" class="btn-feedback" id="btn-nova-publicacao">Nova publicação</button>
+                <div id="feed-posts" class="feed"></div>
+            </div>
+
+            <div id="sub-feedbacks" hidden>
+                <button type="button" class="btn-feedback" id="btn-feedbacks-turma">Ver feedbacks desta disciplina</button>
+            </div>
+        </section>
+
+        <!-- Fórum: publicação aberta (pergunta no topo, respostas abaixo) -->
+        <section id="secao-post" class="secao">
+            <button type="button" class="link-voltar" id="voltar-turma">← Voltar para a disciplina</button>
+            <article id="thread" class="thread"></article>
+        </section>
     </main>
     
     <dialog id="dialog-feedbacks" class="dialog-feedback dialog-largo">
@@ -88,6 +114,38 @@
         </div>
         <div id="lista-feedbacks" class="lista-feedbacks"></div>
         <article id="detalhe-feedback" class="detalhe-feedback" hidden></article>
+    </dialog>
+
+    <dialog id="dialog-post-novo" class="dialog-feedback">
+        <form id="form-post">
+            <h2>Nova publicação</h2>
+
+            <label class="campo">
+                Tipo:
+                <select name="tipo" required>
+                    {% for chave, nome in tipos_post.items() %}
+                        <option value="{{ chave }}">{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="campo">
+                Título:
+                <input type="text" name="titulo" maxlength="150" required>
+            </label>
+
+            <label class="campo">
+                Texto:
+                <textarea name="texto" rows="6" maxlength="2000" required></textarea>
+            </label>
+
+            <p class="erro-fb" id="erro-post"></p>
+
+            <div class="dialog-acoes">
+                <button type="submit">Publicar</button>
+                <button type="button" onclick="this.closest('dialog').close()">Cancelar</button>
+            </div>
+        </form>
     </dialog>
 
     <div class="chat-overlay" id="chat-overlay" style="display:none"></div>
