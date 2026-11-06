@@ -1328,3 +1328,87 @@ main {
 }
 .nova-resposta textarea:focus { outline: none; border-color: var(--laranja); }
 .nova-resposta .erro-fb { color: var(--erro); }
+
+/* Aviso grande de texto bloqueado (fecha só com clique) */
+.aviso-bloqueio {
+    margin: auto;
+    width: min(92vw, 460px);
+    padding: 32px 34px;
+    border: none;
+    border-top: 8px solid var(--erro);
+    border-radius: var(--radius);
+    background: var(--branco);
+    box-shadow: var(--sombra);
+    text-align: center;
+}
+.aviso-bloqueio::backdrop { background: rgba(0, 0, 0, .5); }
+.aviso-bloqueio h2 { margin-bottom: 12px; color: var(--erro); font-size: 22px; }
+.aviso-bloqueio p {
+    margin-bottom: 22px;
+    color: var(--texto);
+    font-size: 16px;
+    line-height: 1.5;
+}
+.aviso-bloqueio button {
+    padding: 12px 36px;
+    border: none;
+    border-radius: 50px;
+    background: var(--verde);
+    color: var(--branco);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s;
+}
+.aviso-bloqueio button:hover { background: var(--laranja); }
+
+/* ─── Denúncia à Ouvidoria ───────────────────────────────────── */
+.btn-denunciar {
+    padding: 2px 8px;
+    border: none;
+    border-radius: 50px;
+    background: transparent;
+    color: #999;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: color .2s, background .2s;
+}
+.btn-denunciar:hover { color: var(--erro); background: rgba(217, 83, 79, .1); }
+
+.post-rodape .btn-denunciar,
+.resposta-acoes .btn-denunciar { margin-left: auto; }
+.detalhe-feedback .btn-denunciar { align-self: flex-start; }
+.msg .btn-denunciar { align-self: flex-start; }
+
+/* nas janelas verdes o cinza some; usa o creme */
+.dialog-feedback .btn-denunciar { color: var(--creme); opacity: .75; }
+.dialog-feedback .btn-denunciar:hover { color: #ffaaaa; opacity: 1; }
+
+/* janela de confirmação (reaproveita o visual do .aviso-bloqueio) */
+.aviso-denuncia { width: min(92vw, 520px); }
+.aviso-denuncia textarea {
+    width: 100%;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 2px solid var(--cinza);
+    border-radius: 14px;
+    background: var(--creme);
+    color: var(--texto);
+    font: inherit;
+    font-size: 13px;
+    resize: none;
+}
+.aviso-acoes { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.btn-ouvidoria {
+    display: inline-block;
+    padding: 12px 28px;
+    border-radius: 50px;
+    background: var(--laranja);
+    color: var(--branco);
+    font-size: 15px;
+    font-weight: 700;
+}
+.btn-ouvidoria:hover { opacity: .9; }
+.aviso-denuncia .btn-cancelar { background: var(--cinza); color: var(--texto); }

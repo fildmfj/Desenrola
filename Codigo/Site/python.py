@@ -7,6 +7,10 @@ import mysql.connector
 import hashlib
 import re
 from flask_socketio import SocketIO, emit, join_room
+import json
+import os
+import urllib.request
+
 
 app = Flask(__name__)
 app.secret_key = 'f01e5011b1c1ff3e0a556e0d607eca775021a2e1d0ec19626e225a00b4b85dc9'
@@ -140,6 +144,58 @@ def sem_cache(resp):
     if request.endpoint != 'static':
         resp.headers['Cache-Control'] = 'no-store'
     return resp
+
+OPENAI_MODERACAO_URL = 'https://api.openai.com/v1/moderations'
+MODERACAO_MODELO = 'omni-moderation-latest'
+
+# Categorias que bloqueiam o envio (ajuste conforme a política da escola).
+# "self-harm" fica de fora de propósito: quem escreve sobre isso precisa ser
+# ouvido por alguém, não barrado.
+CATEGORIAS_BLOQUEADAS = {
+    'harassment', 'harassment/threatening',
+    'hate', 'hate/threatening',
+    'sexual', 'sexual/minors',
+}
+
+# True = se a API falhar (sem chave, fora do ar, limite excedido), o texto NÃO é enviado
+MODERACAO_FALHA_BLOQUEIA = False
+
+MSG_OFENSA = ('Seu texto foi bloqueado por conter conteúdo ofensivo ou inadequado. '
+              'Reescreva de forma respeitosa e tente de novo.')
+MSG_INDISPONIVEL = 'Não foi possível verificar o texto agora. Tente novamente em instantes.'
+
+
+def _falha_moderacao():
+    if MODERACAO_FALHA_BLOQUEIA:
+        return False, MSG_INDISPONIVEL
+    return True, ''
+
+
+def moderar_texto(texto):
+    """Devolve (permitido, mensagem) usando a API de moderação da OpenAI."""
+    chave = os.environ.get('OPENAI_API_KEY')
+    if not chave:
+        app.logger.warning('OPENAI_API_KEY não configurada: moderação desativada')
+        return _falha_moderacao()
+
+    req = urllib.request.Request(
+        OPENAI_MODERACAO_URL,
+        data=json.dumps({'model': MODERACAO_MODELO, 'input': texto}).encode('utf-8'),
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + chave},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            categorias = json.load(resp)['results'][0]['categories']
+    except (OSError, KeyError, IndexError, ValueError):
+        app.logger.exception('Falha ao consultar a API de moderação')
+        return _falha_moderacao()
+
+    marcadas = sorted(c for c, ativa in categorias.items()
+                      if ativa and c in CATEGORIAS_BLOQUEADAS)
+    if marcadas:
+        app.logger.warning('Texto bloqueado pela moderação: %s', ', '.join(marcadas))
+        return False, MSG_OFENSA
+    return True, ''
 
 
 # ══════════════════════════════════════════════════════════════
@@ -850,42 +906,42 @@ def api_meu_feedback_lido(id_feedback):
 @app.route('/feedback', methods=['POST'])
 @acesso('aluno')
 def enviar_feedback():
-    topico = request.form.get('topico', '')
-    # o navegador manda quebra de linha como \r\n; contamos como 1 caractere
-    texto = request.form.get('texto', '').replace('\r\n', '\n').strip()
-    anonimo = 1 if request.form.get('anonimo') else 0
+    dados = request.get_json(silent=True) or {}
+    topico = dados.get('topico', '')
+    texto = texto_valido(dados.get('texto'), 2000)
+    anonimo = 1 if dados.get('anonimo') else 0
     try:
-        id_dp = int(request.form.get('disciplina', ''))
-    except ValueError:
+        id_dp = int(dados.get('disciplina'))
+    except (TypeError, ValueError):
         id_dp = None
 
     if id_dp is None or topico not in TOPICOS_FEEDBACK:
-        flash('Selecione a disciplina e o tópico.', 'erro')
-        
-    elif not texto:
-        flash('Escreva o seu feedback.', 'erro')
-    elif len(texto) > 2000:
-        flash('O feedback pode ter no máximo 2000 caracteres.', 'erro')
-    else:
-        with db() as (conn, cursor):
-            # confere se o aluno realmente está matriculado nessa disciplina
-            cursor.execute(
-                'SELECT 1 FROM matricula_disciplina WHERE id_aluno = %s AND id_disciplina = %s',
-                (session['usuario_id'], id_dp)
-            )
-            if not cursor.fetchone():
-                flash('Você não está matriculado nessa disciplina.', 'erro')
-            else:
-                cursor.execute(
-                    'INSERT INTO feedback (id_aluno, id_disciplina_periodo, topico, texto, anonimo) '
-                    'VALUES (%s, %s, %s, %s, %s)',
-                    (session['usuario_id'], id_dp, topico, texto, anonimo)
-                )
-                conn.commit()
-                flash('Feedback enviado! Obrigado.', 'sucesso')
-                notificar_professor(cursor, id_dp, topico)
+        return erro_json('Selecione a disciplina e o tópico.')
+    if not texto:
+        return erro_json('Escreva o seu feedback (até 2000 caracteres).')
 
-    return redirect(url_for('alunos'))
+    permitido, aviso = moderar_texto(texto)
+    if not permitido:
+        return erro_json(aviso, 422)
+
+    with db() as (conn, cursor):
+        # confere se o aluno realmente está matriculado nessa disciplina
+        cursor.execute(
+            'SELECT 1 FROM matricula_disciplina WHERE id_aluno = %s AND id_disciplina = %s',
+            (session['usuario_id'], id_dp)
+        )
+        if not cursor.fetchone():
+            return erro_json('Você não está matriculado nessa disciplina.', 403)
+
+        cursor.execute(
+            'INSERT INTO feedback (id_aluno, id_disciplina_periodo, topico, texto, anonimo) '
+            'VALUES (%s, %s, %s, %s, %s)',
+            (session['usuario_id'], id_dp, topico, texto, anonimo)
+        )
+        conn.commit()
+        notificar_professor(cursor, id_dp, topico)
+
+    return {'ok': True}
 
 def feedback_para_json(r):
     texto = r['texto']
@@ -980,6 +1036,10 @@ def api_feedback_responder(id_feedback):
         return {'erro': 'Escreva a resposta.'}, 400
     if len(texto) > 2000:
         return {'erro': 'A resposta pode ter no máximo 2000 caracteres.'}, 400
+
+    permitido, aviso = moderar_texto(texto)
+    if not permitido:
+        return erro_json(aviso, 422)
 
     with db() as (conn, cursor):
         # o JOIN garante que só o professor da disciplina responde,
@@ -1118,6 +1178,10 @@ def api_forum_criar_post(id_dp):
     if not texto:
         return erro_json('Escreva o texto (até 2000 caracteres).')
 
+    permitido, aviso = moderar_texto(titulo + '\n' + texto)
+    if not permitido:
+        return erro_json(aviso, 422)
+
     with db() as (conn, cursor):
         if not pode_ver_turma(cursor, id_dp):
             return erro_json('Sem acesso a esta disciplina.', 403)
@@ -1170,6 +1234,10 @@ def api_forum_responder(id_post):
     texto = texto_valido((request.get_json(silent=True) or {}).get('texto'), 2000)
     if not texto:
         return erro_json('Escreva a resposta (até 2000 caracteres).')
+
+    permitido, aviso = moderar_texto(texto)
+    if not permitido:
+        return erro_json(aviso, 422)
 
     with db() as (conn, cursor):
         cursor.execute('SELECT id_disciplina_periodo FROM forum_post WHERE id_post = %s',
@@ -1334,6 +1402,7 @@ def get_mensagens(id_destinatario):
 
     # converte datetime para string
     for m in msgs:
+        m['data_completa'] = m['criado_em'].strftime('%d/%m/%Y %H:%M')
         m['criado_em'] = m['criado_em'].strftime('%H:%M')
     return {'mensagens': msgs}
 
@@ -1368,6 +1437,11 @@ def handle_mensagem(data):
     if not conteudo:
         return
 
+    permitido, aviso = moderar_texto(conteudo)
+    if not permitido:
+        emit('mensagem_bloqueada', {'motivo': aviso, 'texto': conteudo})   # volta só para quem enviou
+        return
+
     with db() as (conn, cursor):
         cursor.execute(
             'INSERT INTO mensagem (id_remetente, id_destinatario, conteudo) VALUES (%s, %s, %s)',
@@ -1379,7 +1453,8 @@ def handle_mensagem(data):
         'conteudo': conteudo,
         'id_remetente': session['usuario_id'],
         'nome_remetente': session['nome'],
-        'criado_em': '__agora__'
+        'criado_em': '__agora__',
+        'data_completa': datetime.now().strftime('%d/%m/%Y %H:%M')
     }, to=sala_do_chat(session['usuario_id'], id_dest))
 
 

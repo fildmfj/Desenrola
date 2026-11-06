@@ -160,6 +160,11 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         socket.on('nova_mensagem', msg => { adicionarMensagem(msg, true); atualizarListaConversas(msg); });
+        socket.on('mensagem_bloqueada', function (d) {
+            avisar(d.motivo);
+            const input = document.getElementById('chat-input-texto');
+            if (input) input.value = d.texto;        // devolve o texto para a pessoa corrigir
+        });
         socket.on('novo_feedback', d => { if (window.notificarFeedback) window.notificarFeedback(d); });
         socket.on('feedback_respondido', d => { if (window.notificarResposta) window.notificarResposta(d); });
 
@@ -220,6 +225,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 <span class="msg-texto">${msg.conteudo}</span>
                 <span class="msg-hora">${hora}</span>
             `;
+            if (!souEu) {
+                div.appendChild(botaoDenuncia({
+                    tipo: 'Mensagem de chat', autor: msg.nome_remetente,
+                    data: msg.data_completa || hora, texto: msg.conteudo
+                }));
+            }
             container.appendChild(div);
             if (rolar) container.scrollTop = container.scrollHeight;
         }
@@ -402,6 +413,91 @@ document.addEventListener('DOMContentLoaded', function () {
         }));
     }
 
+    // aviso grande no centro da tela; só fecha quando a pessoa clica
+    function avisar(texto) {
+        document.querySelectorAll('.aviso-bloqueio').forEach(d => d.remove());
+
+        const dialogo = el('dialog', 'aviso-bloqueio');
+        const botao = el('button', '', 'Entendi');
+        botao.type = 'button';
+        botao.addEventListener('click', () => dialogo.close());
+        dialogo.addEventListener('close', () => dialogo.remove());
+
+        dialogo.append(el('h2', '', 'Aviso'), el('p', '', texto), botao);
+        document.body.appendChild(dialogo);
+        dialogo.showModal();
+    }
+
+    // confirmação rápida no canto da tela (some sozinha)
+    function confirmar(texto) {
+        document.querySelectorAll('.toast-feedback').forEach(t => t.remove());
+        const toast = el('div', 'toast-feedback', texto);
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    // Página para onde a denúncia é levada. Troque pelo endereço da ouvidoria do IFSul, se preferir.
+    const URL_OUVIDORIA = 'https://falabr.cgu.gov.br/web/home';
+
+    // Janela de confirmação: mostra os dados, copia para a área de transferência
+    // e abre a Ouvidoria em outra aba. Nada é enviado pela plataforma.
+    function denunciar(d) {
+        document.querySelectorAll('.aviso-denuncia').forEach(x => x.remove());
+
+        const resumo = [
+            'Denúncia sobre conteúdo da plataforma Desenrola (IFSul)',
+            'Tipo: ' + d.tipo,
+            'Autor: ' + (d.autor || 'não identificado (enviado como anônimo)'),
+            'Data: ' + d.data,
+            d.ref ? 'Referência: ' + d.ref : null,
+            'Conteúdo: ' + d.texto
+        ].filter(Boolean).join('\n');
+
+        const dialogo = el('dialog', 'aviso-bloqueio aviso-denuncia');
+
+        const campo = el('textarea');
+        campo.readOnly = true;
+        campo.rows = 7;
+        campo.value = resumo;
+
+        const abrir = el('a', 'btn-ouvidoria', 'Copiar e abrir a Ouvidoria');
+        abrir.href = URL_OUVIDORIA;
+        abrir.target = '_blank';
+        abrir.rel = 'noopener noreferrer';
+        abrir.addEventListener('click', function () {
+            if (navigator.clipboard) navigator.clipboard.writeText(resumo).catch(() => {});
+            dialogo.close();
+        });
+
+        const cancelar = el('button', 'btn-cancelar', 'Cancelar');
+        cancelar.type = 'button';
+        cancelar.addEventListener('click', () => dialogo.close());
+
+        const acoes = el('div', 'aviso-acoes');
+        acoes.append(abrir, cancelar);
+
+        dialogo.addEventListener('close', () => dialogo.remove());
+        dialogo.append(
+            el('h2', '', 'Denunciar conteúdo'),
+            el('p', '', 'Você será levado ao site da Ouvidoria. Copiamos os dados abaixo para você colar na denúncia.'),
+            campo,
+            acoes
+        );
+        document.body.appendChild(dialogo);
+        dialogo.showModal();
+    }
+
+    function botaoDenuncia(dados) {
+        const b = el('button', 'btn-denunciar', '⚑ Denunciar');
+        b.type = 'button';
+        b.title = 'Denunciar este conteúdo à Ouvidoria';
+        b.addEventListener('click', function (e) {
+            e.stopPropagation();          // não abre o card/publicação por baixo
+            denunciar(dados);
+        });
+        return b;
+    }
+
     if (btnNotif && dialogFb) {
         const badge   = document.getElementById('badge-feedback');
         const titulo  = document.getElementById('titulo-feedbacks');
@@ -450,7 +546,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 el('h3', '', f.topico),
                 el('p', 'meta-fb', (f.autor || 'Anônimo') + ' · ' + f.periodo + ' · ' + f.data),
                 el('p', 'texto-fb', f.texto),
-                blocoResposta(f)
+                blocoResposta(f),
+                botaoDenuncia({
+                    tipo: 'Feedback de aluno', autor: f.autor, data: f.data,
+                    texto: f.texto, ref: 'feedback #' + f.id
+                }),
             );
 
             if (!f.lido) {                          // abrir a mensagem marca como lida
@@ -613,7 +713,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 partes.push(
                     el('h3', '', 'Resposta do professor'),
                     el('p', 'meta-fb', f.respondido_em),
-                    el('p', 'texto-fb resposta-fb', f.resposta)
+                    el('p', 'texto-fb resposta-fb', f.resposta),
+                    botaoDenuncia({
+                        tipo: 'Resposta do professor a um feedback',
+                        autor: 'Professor(a) de ' + f.disciplina,
+                        data: f.respondido_em, texto: f.resposta, ref: 'feedback #' + f.id
+                    })
                 );
             } else {
                 partes.push(el('p', 'meta-fb', 'Ainda sem resposta do professor.'));
@@ -634,6 +739,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 .then(function (d) { meus = d.feedbacks; mostrarMeus(); })
                 .catch(() => {});
         }
+
+        window.recarregarMeusFeedbacks = carregarMeus;
 
         // aviso em tempo real (chamado pelo socket, ver seção 6)
         window.notificarResposta = function (d) {
@@ -712,6 +819,10 @@ document.addEventListener('DOMContentLoaded', function () {
             rodape.append(botaoVoto('post', p.id, p.votos, p.votei),
                           el('span', '', '💬 ' + p.respostas));
             if (p.resolvido) rodape.append(el('span', 'selo-resolvido', '✔ Resolvido'));
+            rodape.append(botaoDenuncia({
+                tipo: 'Publicação do fórum', autor: nomeAutor(p), data: p.data,
+                texto: p.titulo + '\n' + p.texto, ref: 'publicação #' + p.id
+            }));
             return rodape;
         }
 
@@ -743,6 +854,10 @@ document.addEventListener('DOMContentLoaded', function () {
                                            (r.aceita ? ' · ✔ Melhor resposta' : ''));
             const acoes = el('div', 'resposta-acoes');
             acoes.append(botaoVoto('resposta', r.id, r.votos, r.votei));
+            acoes.append(botaoDenuncia({
+                tipo: 'Resposta do fórum', autor: nomeAutor(r), data: r.data,
+                texto: r.texto, ref: 'resposta #' + r.id
+            }));
 
             if (d.pode_aceitar && !r.aceita) {
                 const b = el('button', 'btn-aceitar', '✔ Melhor resposta');
@@ -838,6 +953,37 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('btn-nova-publicacao').addEventListener('click', () => dialogPost.showModal());
 
         const btnFeedback = document.getElementById('btn-abrir-feedback');          // aluno
+
+        const formFeedback = document.getElementById('form-feedback');
+        if (formFeedback) {
+            const erroFeedback = document.getElementById('erro-feedback');
+            const dialogFeedback = document.getElementById('dialog-feedback');
+
+            formFeedback.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const f = new FormData(formFeedback);
+                const botao = formFeedback.querySelector('button[type="submit"]');
+                botao.disabled = true;
+
+                api('/feedback', {
+                    disciplina: f.get('disciplina'),
+                    topico: f.get('topico'),
+                    texto: f.get('texto'),
+                    anonimo: f.get('anonimo') === '1'
+                })
+                    .then(function () {
+                        formFeedback.reset();
+                        document.getElementById('contador-feedback').textContent = '0';
+                        erroFeedback.textContent = '';
+                        dialogFeedback.close();
+                        confirmar('Feedback enviado! Obrigado.');
+                        if (window.recarregarMeusFeedbacks) window.recarregarMeusFeedbacks();
+                    })
+                    .catch(err => { erroFeedback.textContent = err.message; })
+                    .finally(() => { botao.disabled = false; });
+            });
+        }
+
         if (btnFeedback) {
             btnFeedback.addEventListener('click', function () {
                 const dialogFeedback = document.getElementById('dialog-feedback');
